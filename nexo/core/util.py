@@ -7,6 +7,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 IS_WIN = sys.platform.startswith("win")
@@ -46,11 +47,25 @@ def load_json(name: str, default):
         return default
 
 
+# várias threads (interface, testes de velocidade, antivírus…) gravam ficheiros de configuração
+_save_lock = threading.RLock()
+
+
 def save_json(name: str, data) -> None:
+    """Grava de forma atómica: escreve num temporário único e só depois substitui o ficheiro."""
     p = config_dir() / name
-    tmp = p.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(p)
+    with _save_lock:
+        text = json.dumps(data, indent=2, ensure_ascii=False)
+        tmp = p.with_name(f".{p.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+        try:
+            tmp.write_text(text, encoding="utf-8")
+            tmp.replace(p)
+        finally:
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
 
 
 # ---------------------------------------------------------------- Definições
@@ -103,7 +118,11 @@ _settings: dict | None = None
 def settings() -> dict:
     """Definições do utilizador (lidas uma vez e mantidas em memória)."""
     global _settings
-    if _settings is None:
+    if _settings is not None:
+        return _settings
+    with _save_lock:
+        if _settings is not None:
+            return _settings
         data = load_json("settings.json", {})
         _settings = {**DEFAULT_SETTINGS, **(data if isinstance(data, dict) else {})}
         # versões antigas não tinham o contador de FPS: acrescenta-o uma vez à lista do overlay
@@ -121,13 +140,14 @@ def get_setting(key: str, default=None):
 
 def set_setting(key: str, value) -> None:
     s = settings()
-    if s.get(key) == value:
-        return
-    s[key] = value
-    try:
-        save_json("settings.json", s)
-    except OSError:
-        pass
+    with _save_lock:
+        if s.get(key) == value:
+            return
+        s[key] = value
+        try:
+            save_json("settings.json", dict(s))
+        except OSError:
+            pass
 
 
 def run(cmd: list[str] | str, timeout: float = 30, shell: bool = False) -> tuple[int, str]:
@@ -227,36 +247,65 @@ def _sh_quote(s: str) -> str:
     return "'" + s.replace("'", "'\\''") + "'"
 
 
+def _refuse_delete(path: str) -> bool:
+    """Segunda barreira (além da interface): nunca apagar raízes de discos, a pasta pessoal
+    inteira nem nada que as regras de segurança classifiquem como sistema."""
+    real = os.path.realpath(path)
+    if os.path.dirname(real) == real or real == os.path.realpath(os.path.expanduser("~")):
+        return True
+    from . import disksafety  # importação tardia: disksafety importa este módulo
+    return any(disksafety.classify(x).level == disksafety.SYSTEM for x in {path, real})
+
+
+def _win_force_delete(path: str) -> None:
+    """Windows (já como administrador): toma posse, dá controlo total aos Administradores e apaga.
+    Argumentos em lista, sem passar pela linha de comandos (nada de %VAR% ou & a ser interpretado)."""
+    is_dir = os.path.isdir(path) and not os.path.islink(path)
+    run(["takeown", "/F", path, "/A", *(["/R", "/D", "Y"] if is_dir else [])], timeout=600)
+    run(["icacls", path, "/grant", "*S-1-5-32-544:F", "/C", "/Q", *(["/T"] if is_dir else [])], timeout=600)
+
+    def _retry(func, p, _exc):
+        try:
+            os.chmod(p, 0o777)
+            func(p)
+        except OSError:
+            pass
+    try:
+        if is_dir:
+            shutil.rmtree(path, onerror=_retry)
+        else:
+            try:
+                os.chmod(path, 0o777)
+            except OSError:
+                pass
+            os.remove(path)
+    except OSError:
+        pass
+
+
 def delete_as_admin(paths: list[str]) -> tuple[list[str], str]:
     """Apaga definitivamente ficheiros/pastas que precisam de privilégios.
     Linux: um único pedido de palavra-passe (pkexec) para todos. Windows: só funciona se o Nexo
     já estiver como administrador (toma posse e apaga). Devolve (apagados, mensagem de erro)."""
     paths = [p for p in paths if p and os.path.lexists(p)]
-    # proteção extra: nunca raízes de discos nem a pasta pessoal inteira
-    home = os.path.realpath(os.path.expanduser("~"))
-    paths = [p for p in paths
-             if os.path.dirname(os.path.realpath(p)) != os.path.realpath(p) and os.path.realpath(p) != home]
+    refused = [p for p in paths if _refuse_delete(p)]
+    paths = [p for p in paths if p not in refused]
+    note = f"{len(refused)} itens de sistema foram recusados" if refused else ""
     if not paths:
-        return [], ""
+        return [], note
     if IS_WIN:
         if not is_admin():
             return [], "admin"
         for p in paths:
-            q = p.replace('"', "")
-            if os.path.isdir(p) and not os.path.islink(p):
-                cmd = (f'takeown /F "{q}" /R /A /D Y >nul 2>&1 & icacls "{q}" /grant *S-1-5-32-544:F /T /C /Q >nul 2>&1'
-                       f' & rd /s /q "{q}"')
-            else:
-                cmd = (f'takeown /F "{q}" /A >nul 2>&1 & icacls "{q}" /grant *S-1-5-32-544:F /C /Q >nul 2>&1'
-                       f' & del /f /q /a "{q}"')
-            run(cmd, timeout=600, shell=True)
+            _win_force_delete(p)
         out = ""
     else:
         code, out = run_root("rm -rf -- " + " ".join(_sh_quote(p) for p in paths), timeout=900)
         if code in (126, 127) and all(os.path.lexists(p) for p in paths):
             return [], out or "Pedido de palavra-passe cancelado."
     done = [p for p in paths if not os.path.lexists(p)]
-    return done, ("" if len(done) == len(paths) else (out[-300:] if out else "alguns itens continuam em uso"))
+    err = "" if len(done) == len(paths) else (out[-300:] if out else "alguns itens continuam em uso")
+    return done, "; ".join(x for x in (err, note) if x)
 
 
 # ---------------------------------------------------------------- Formatação

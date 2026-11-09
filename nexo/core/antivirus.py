@@ -25,7 +25,7 @@ from pathlib import Path
 
 import psutil
 
-from .util import IS_LINUX, IS_WIN, _NO_WINDOW, as_list, config_dir, load_json, ps_json, run, run_ps, run_root, save_json, which
+from .util import IS_LINUX, IS_WIN, _NO_WINDOW, _save_lock, as_list, config_dir, load_json, ps_json, run, run_ps, run_root, save_json, which
 
 BAD, WARN, INFO = "bad", "warn", "info"
 LEVEL_NAMES = {BAD: "Ameaça", WARN: "Suspeito", INFO: "Informação"}
@@ -934,10 +934,11 @@ def scan(mode: str = "quick", target: str = "", use_engine: bool = True, progres
 
 # =========================================================================== ações
 def ignore(f: Finding) -> None:
-    lst = load_json("av_ignorar.json", [])
-    if f.key not in lst:
-        lst.append(f.key)
-        save_json("av_ignorar.json", lst)
+    with _save_lock:
+        lst = load_json("av_ignorar.json", [])
+        if f.key not in lst:
+            lst.append(f.key)
+            save_json("av_ignorar.json", lst)
 
 
 def clear_ignored() -> int:
@@ -1028,10 +1029,11 @@ def quarantine(path: str, reason: str) -> tuple[bool, str]:
         os.chmod(dst, 0o400)
     except OSError:
         pass
-    lst = quarantine_list()
-    lst.append({"id": qid, "name": os.path.basename(path), "original": path, "mode": mode, "size": size,
-                "when": time.time(), "reason": reason})
-    save_json("quarentena.json", lst)
+    with _save_lock:  # várias ações em paralelo não podem perder entradas (o ficheiro ficaria órfão)
+        lst = quarantine_list()
+        lst.append({"id": qid, "name": os.path.basename(path), "original": path, "mode": mode, "size": size,
+                    "when": time.time(), "reason": reason})
+        save_json("quarentena.json", lst)
     return True, f"{os.path.basename(path)} foi para a quarentena (já não pode ser executado)."
 
 
@@ -1076,7 +1078,8 @@ def _q_remove(qid: str) -> None:
         p.unlink()
     except OSError:
         pass
-    save_json("quarentena.json", [x for x in quarantine_list() if x["id"] != qid])
+    with _save_lock:
+        save_json("quarentena.json", [x for x in quarantine_list() if x["id"] != qid])
 
 
 def finding_dict(f: Finding) -> dict:

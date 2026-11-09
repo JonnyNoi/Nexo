@@ -10,7 +10,7 @@ import os
 import re
 
 from . import snapshot
-from .util import IS_LINUX, IS_WIN, is_admin, load_json, read_text, run, run_root, save_json, which
+from .util import IS_LINUX, IS_WIN, _save_lock, is_admin, load_json, read_text, run, run_root, save_json, which
 
 BACKUP_FILE = "tweaks_backup.json"
 
@@ -36,15 +36,19 @@ class Tweak:
     def _backup_get(self, key, default=None):
         return load_json(BACKUP_FILE, {}).get(f"{self.id}:{key}", default)
 
+    # ler-alterar-gravar sob o mesmo trinco: dois ajustes ligados ao mesmo tempo não podem
+    # perder o valor original um do outro
     def _backup_set(self, key, value) -> None:
-        data = load_json(BACKUP_FILE, {})
-        data.setdefault(f"{self.id}:{key}", value)  # só guarda o primeiro (o original)
-        save_json(BACKUP_FILE, data)
+        with _save_lock:
+            data = load_json(BACKUP_FILE, {})
+            data.setdefault(f"{self.id}:{key}", value)  # só guarda o primeiro (o original)
+            save_json(BACKUP_FILE, data)
 
     def _backup_clear(self, key) -> None:
-        data = load_json(BACKUP_FILE, {})
-        data.pop(f"{self.id}:{key}", None)
-        save_json(BACKUP_FILE, data)
+        with _save_lock:
+            data = load_json(BACKUP_FILE, {})
+            data.pop(f"{self.id}:{key}", None)
+            save_json(BACKUP_FILE, data)
 
 
 # =========================================================================== Windows
