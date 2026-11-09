@@ -16,7 +16,7 @@ from . import logo as logo_mod
 from .backgrounds import Backdrop
 from .icons import icon as make_icon
 from .icons import pixmap as icon_pixmap
-from .widgets import Bar, SensorHub, icon_badge, label, set_notify_target
+from .widgets import Bar, SensorHub, icon_badge, label, run_async, set_notify_target
 
 
 def _page_factories(hub, on_settings):
@@ -559,6 +559,14 @@ class MainWindow(QMainWindow):
         self._upd_timer.timeout.connect(self._auto_updates)
         self._upd_timer.start(30 * 60_000)
         QTimer.singleShot(90_000, self._auto_updates)   # depois do arranque, sem pesar no início
+        # ------------------------------------------------------------- vigilância (disco cheio, S.M.A.R.T.)
+        from ..core.watch import DiskAlerts
+        self._disk_alerts = DiskAlerts()
+        self._watch_busy = False
+        self._watch_timer = QTimer(self)
+        self._watch_timer.timeout.connect(self._watch)
+        self._watch_timer.start(5 * 60_000)
+        QTimer.singleShot(45_000, self._watch)
         # ------------------------------------------------------------- ventoinhas
         # o gestor das ventoinhas só nasce se houver um perfil ativo (ou quando a página abre)
         if get_setting("fan_profile", "auto") != "auto":
@@ -770,6 +778,30 @@ class MainWindow(QMainWindow):
         self.notify(msg, kind)
         if self.tray is not None and (not self.isVisible() or self.isMinimized() or not self.isActiveWindow()):
             self.tray.showMessage(APP_NAME, msg, QSystemTrayIcon.Warning, 8000)
+
+    def _watch(self):
+        """A cada 5 min: espaço livre dos discos e alterações na cache do S.M.A.R.T. (sem pedir palavra-passe)."""
+        if self._watch_busy or not (get_setting("alert_disk") or get_setting("alert_smart")):
+            return
+        self._watch_busy = True
+        from ..core import watch
+
+        def work():
+            msgs = []
+            if get_setting("alert_disk"):
+                msgs += self._disk_alerts.check(watch.disk_usages(), float(get_setting("alert_disk_pct") or 10))
+            if get_setting("alert_smart"):
+                msgs += watch.smart_check_cached()
+            return msgs
+
+        def done(msgs):
+            self._watch_busy = False
+            for m, kind in msgs:
+                self._alert(m, kind)
+
+        def fail(_m):
+            self._watch_busy = False
+        run_async(work, on_done=done, on_fail=fail)
 
     # ------------------------------------------------------------------ notificações e leitura ao vivo
     def notify(self, msg: str, kind: str = "info"):

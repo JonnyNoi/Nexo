@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QHBoxLayout, QHeaderView, QPushButton, QTableWidget, QTableWidgetItem,
                                QWidget)
 
-from ...core import memory, tweaks
+from ...core import memory, snapshot, tweaks
 from ...core.util import human_bytes
 from ..widgets import Card, Page, SettingRow, Toggle, confirm, label, notify, run_async, separator
 
@@ -57,7 +57,15 @@ class TweakList(Card):
             tg.setEnabled(True)
             notify(f"{t.name}: {msg}", "ok" if ok else "bad")
             self.refresh()
-        run_async(t.set, on, on_done=done)
+
+        def work():
+            # Windows; no Linux o snapshot vai junto do próprio comando root (um só pedido de palavra-passe)
+            snap = snapshot.before(f"ajuste: {t.name}") if on else None
+            ok, msg = t.set(on)
+            if snap and not snap[0]:
+                msg += " (aviso: não foi possível criar o ponto de restauro)"
+            return ok, msg
+        run_async(work, on_done=done)
 
     def restore(self):
         if not confirm(self, "Restaurar", "Desligar todos os ajustes e repor os valores originais?"):

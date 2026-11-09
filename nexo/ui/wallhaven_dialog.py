@@ -1,9 +1,11 @@
 """Galeria do wallhaven.cc: pesquisar, ver miniaturas e aplicar como fundo do Nexo."""
 from __future__ import annotations
 
+import random
+import string
 from concurrent.futures import ThreadPoolExecutor
 
-from PySide6.QtCore import QSize, Qt, QUrl
+from PySide6.QtCore import QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog, QHBoxLayout, QLineEdit, QListView,
                                QListWidget, QListWidgetItem, QPushButton, QVBoxLayout)
@@ -36,6 +38,9 @@ class WallhavenDialog(QDialog):
         self.last_page = 1
         self.gen = 0          # invalida miniaturas de pesquisas anteriores
         self.busy = False
+        self.loading = False  # há uma página a caminho
+        self.seen: set[str] = set()
+        self.seed = ""         # mantém a ordem 'aleatória' igual entre páginas (sem repetidos)
 
         v = QVBoxLayout(self)
         v.setContentsMargins(18, 16, 18, 16)
@@ -77,6 +82,10 @@ class WallhavenDialog(QDialog):
         self.grid.setUniformItemSizes(True)
         self.grid.setSelectionMode(QAbstractItemView.SingleSelection)
         self.grid.setSpacing(6)
+        # deslizar suave e carregar a página seguinte ao chegar perto do fim
+        self.grid.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.grid.verticalScrollBar().setSingleStep(40)
+        self.grid.verticalScrollBar().valueChanged.connect(self._maybe_more)
         v.addWidget(self.grid, 1)
 
         bottom = QHBoxLayout()
@@ -128,14 +137,26 @@ class WallhavenDialog(QDialog):
     def search(self):
         self.gen += 1
         self.page = 1
+        self.last_page = 1
+        self.loading = False
         self.items.clear()
+        self.seen.clear()
+        self.seed = "".join(random.choices(string.ascii_letters + string.digits, k=6))
         self.grid.clear()
         self._fetch()
 
     def more(self):
-        if self.page < self.last_page:
+        if self.page < self.last_page and not self.loading:
             self.page += 1
             self._fetch()
+
+    def _maybe_more(self, *_a):
+        """Carrega a página seguinte quando faltam menos de ~2 linhas para o fim (ou se a lista não enche a janela)."""
+        if self.loading or self.page >= self.last_page or not self.items:
+            return
+        sb = self.grid.verticalScrollBar()
+        if sb.maximum() - sb.value() <= THUMB.height() * 2:
+            self.more()
 
     def _offline(self) -> bool:
         from .netmonitor import monitor, require_online
@@ -148,6 +169,8 @@ class WallhavenDialog(QDialog):
     def _fetch(self):
         if self._offline():
             self.btn_more.setEnabled(True)
+            if self.page > 1:
+                self.page -= 1
             return
         q = self.q.text().strip()
         sorting = wh.SORTS[self.sort.currentText()]
@@ -155,13 +178,14 @@ class WallhavenDialog(QDialog):
         uw, min_res = self.uw.isChecked(), self.min_res
         set_setting("wh_query", q)
         set_setting("wh_category", self.cat.currentText())
-        gen, page = self.gen, self.page
-        self.status.setText("A pesquisar…")
+        gen, page, seed = self.gen, self.page, self.seed
+        self.loading = True
+        self.status.setText("A pesquisar…" if page == 1 else f"{len(self.items)} resultados — a carregar mais…")
         self.btn_more.setEnabled(False)
         holder: dict = {}
 
         def work():
-            items, last = wh.search(q, sorting, page, min_res, cats, uw)
+            items, last = wh.search(q, sorting, page, min_res, cats, uw, seed=seed)
             holder["t"].progress.emit(("list", items, last))
 
             def one(it):
@@ -179,6 +203,9 @@ class WallhavenDialog(QDialog):
             if ev[0] == "list":
                 _k, items, last = ev
                 self.last_page = last
+                self.loading = False
+                items = [it for it in items if it["id"] not in self.seen]
+                self.seen.update(it["id"] for it in items)
                 for it in items:
                     li = QListWidgetItem(f"{it['res']} · {human_bytes(it['size'])}")
                     li.setData(Qt.UserRole, it)
@@ -186,9 +213,12 @@ class WallhavenDialog(QDialog):
                     li.setSizeHint(QSize(THUMB.width() + 12, THUMB.height() + 30))
                     self.grid.addItem(li)
                 self.items += items
-                self.status.setText(f"{len(self.items)} resultados" + (" — sem resultados, tente outra pesquisa."
-                                                                        if not self.items else ""))
+                end = " — fim dos resultados" if self.items and self.page >= self.last_page else ""
+                self.status.setText(f"{len(self.items)} resultados{end}" + (" — sem resultados, tente outra pesquisa."
+                                                                             if not self.items else ""))
                 self.btn_more.setEnabled(self.page < self.last_page)
+                # se a página não encheu a janela, pede logo a seguinte (depois de o layout assentar)
+                QTimer.singleShot(250, lambda g=gen: g == self.gen and self._maybe_more())
             else:
                 _k, iid, data = ev
                 img = QImage.fromData(data)
@@ -204,6 +234,9 @@ class WallhavenDialog(QDialog):
 
         def fail(msg):
             if gen == self.gen:
+                self.loading = False
+                if self.page > 1:
+                    self.page -= 1   # 'Carregar mais' volta a tentar a mesma página
                 self.status.setText(f"Não foi possível ligar ao wallhaven.cc: {friendly_error(msg)}")
                 self.btn_more.setEnabled(True)
 

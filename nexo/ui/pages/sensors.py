@@ -90,7 +90,9 @@ class SensorsPage(Page):
         self.view_group = QButtonGroup(self)
         self.btn_simple = QPushButton("Simples")
         self.btn_all = QPushButton("Todos os sensores")
-        for i, b in enumerate((self.btn_simple, self.btn_all)):
+        self.btn_hist = QPushButton("Histórico")
+        self.btn_hist.setToolTip("Temperaturas, carga e consumo da última hora, 24 horas ou 7 dias")
+        for i, b in enumerate((self.btn_simple, self.btn_all, self.btn_hist)):
             b.setObjectName("Chip")
             b.setCheckable(True)
             self.view_group.addButton(b, i)
@@ -109,6 +111,7 @@ class SensorsPage(Page):
         self.head.addSpacing(12)
         self.head.addWidget(self.btn_simple)
         self.head.addWidget(self.btn_all)
+        self.head.addWidget(self.btn_hist)
         self.reset.clicked.connect(self._reset)
         self.btn_csv.clicked.connect(self._toggle_csv)
 
@@ -171,21 +174,29 @@ class SensorsPage(Page):
         self.stack = QStackedWidget()
         self.stack.addWidget(simple)
         self.stack.addWidget(adv)
+        from ..historyview import HistoryView
+        self.hist = HistoryView(hub)
+        self.stack.addWidget(self.hist)
         self.add(self.stack, 1)
         self.note = label("", "Muted", wrap=True)
         self.add(self.note)
         hub.updated.connect(self._update)
         hub.updated.connect(self._update_simple)
-        view = 1 if get_setting("sensors_view", "simple") == "all" else 0
+        view = {"all": 1, "history": 2}.get(get_setting("sensors_view", "simple"), 0)
         self.view_group.button(view).setChecked(True)
         self._set_view(view)
 
     # ------------------------------------------------------------------ vista
     def _set_view(self, i: int):
         self.stack.setCurrentIndex(i)
-        set_setting("sensors_view", "all" if i else "simple")
+        set_setting("sensors_view", ("simple", "all", "history")[i])
         for w in (self.search, self.reset, self.btn_csv):
-            w.setVisible(bool(i))
+            w.setVisible(i == 1)
+        if i == 2:
+            if self.isVisible():
+                self.hist.start()
+            return
+        self.hist.stop()
         if i:
             self._filter()
         else:
@@ -350,10 +361,15 @@ class SensorsPage(Page):
         notify("A gravar sensores a cada segundo (continua mesmo noutras páginas).", "info")
 
     def on_show(self):
-        if self.stack.currentIndex():
+        if self.stack.currentIndex() == 2:
+            self.hist.start()
+        elif self.stack.currentIndex():
             self._filter()
         else:
             self._update_simple(self.hub.last, force=True)
+
+    def on_hide(self):
+        self.hist.stop()
 
     def _kind(self):
         b = self.chip_group.checkedButton()

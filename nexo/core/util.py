@@ -74,6 +74,14 @@ DEFAULT_SETTINGS = {
     "alerts": True,          # avisar quando a CPU/GPU aquecem demais
     "alert_cpu": 90,
     "alert_gpu": 85,
+    "alert_ram": True,       # avisar quando a RAM fica quase cheia durante 2 minutos
+    "alert_ram_pct": 92,
+    "alert_disk": True,      # avisar quando um disco fica com pouco espaço livre
+    "alert_disk_pct": 10,    # % livre mínima
+    "alert_smart": True,     # avisar quando a saúde de um disco (S.M.A.R.T.) piora
+    "history": True,         # guardar o histórico dos sensores (média por minuto, 7 dias)
+    "snapshot_before": True,  # criar ponto de restauro antes de alterar o sistema
+    "snapshot_last": 0,
     "tray": True,            # ícone na bandeja do sistema
     "close_to_tray": False,  # fechar a janela deixa o Nexo a correr na bandeja
     "start_minimized": False,
@@ -213,6 +221,42 @@ def run_root(shell_cmd: str, timeout: float = 300) -> tuple[int, str]:
     if which("pkexec"):
         return run(["pkexec", "sh", "-c", shell_cmd], timeout=timeout)
     return 126, "pkexec não está instalado; execute o Nexo como root para esta ação."
+
+
+def _sh_quote(s: str) -> str:
+    return "'" + s.replace("'", "'\\''") + "'"
+
+
+def delete_as_admin(paths: list[str]) -> tuple[list[str], str]:
+    """Apaga definitivamente ficheiros/pastas que precisam de privilégios.
+    Linux: um único pedido de palavra-passe (pkexec) para todos. Windows: só funciona se o Nexo
+    já estiver como administrador (toma posse e apaga). Devolve (apagados, mensagem de erro)."""
+    paths = [p for p in paths if p and os.path.lexists(p)]
+    # proteção extra: nunca raízes de discos nem a pasta pessoal inteira
+    home = os.path.realpath(os.path.expanduser("~"))
+    paths = [p for p in paths
+             if os.path.dirname(os.path.realpath(p)) != os.path.realpath(p) and os.path.realpath(p) != home]
+    if not paths:
+        return [], ""
+    if IS_WIN:
+        if not is_admin():
+            return [], "admin"
+        for p in paths:
+            q = p.replace('"', "")
+            if os.path.isdir(p) and not os.path.islink(p):
+                cmd = (f'takeown /F "{q}" /R /A /D Y >nul 2>&1 & icacls "{q}" /grant *S-1-5-32-544:F /T /C /Q >nul 2>&1'
+                       f' & rd /s /q "{q}"')
+            else:
+                cmd = (f'takeown /F "{q}" /A >nul 2>&1 & icacls "{q}" /grant *S-1-5-32-544:F /C /Q >nul 2>&1'
+                       f' & del /f /q /a "{q}"')
+            run(cmd, timeout=600, shell=True)
+        out = ""
+    else:
+        code, out = run_root("rm -rf -- " + " ".join(_sh_quote(p) for p in paths), timeout=900)
+        if code in (126, 127) and all(os.path.lexists(p) for p in paths):
+            return [], out or "Pedido de palavra-passe cancelado."
+    done = [p for p in paths if not os.path.lexists(p)]
+    return done, ("" if len(done) == len(paths) else (out[-300:] if out else "alguns itens continuam em uso"))
 
 
 # ---------------------------------------------------------------- Formatação

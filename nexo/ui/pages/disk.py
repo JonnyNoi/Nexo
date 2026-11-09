@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QGridLayout
 
 from ...core import cleanup, diskscan
 from ...core import disksafety as ds
-from ...core.util import IS_WIN, human_bytes, open_path
+from ...core.util import IS_WIN, delete_as_admin, human_bytes, is_admin, open_path, relaunch_as_admin
 from ..theme import qc
 from ..widgets import Bar, Card, Page, Task, confirm, label, notify, run_async, status_dot
 
@@ -698,25 +698,68 @@ class DiskPage(Page):
                 out.append((item, p, move_to_trash(p) if trash else delete_permanent(p)))
             return out
 
-        def done(res):
-            ok = [(i, p) for i, p, good in res if good]
-            failed = len(res) - len(ok)
-            freed = sum(sizes.get(p, 0) for _i, p in ok)
-            for item, _p in ok:
+        def remove_rows(items):
+            for item, _p in items:
                 if isinstance(item, QTreeWidgetItem):
                     par = item.parent()
                     (par.removeChild(item) if par else None)
                 elif table is not None and item.tableWidget() is table:
                     table.removeRow(item.row())
-            if trash and failed and not ok:
-                notify("Não foi possível mover para o lixo (sem permissão ou lixo indisponível nesta unidade).", "bad")
-            else:
+
+        def done(res):
+            ok = [(i, p) for i, p, good in res if good]
+            # o que falhou e ainda existe é quase sempre falta de permissão (ficheiros do root/admin)
+            stuck = [(i, p) for i, p, good in res if not good and os.path.lexists(p)]
+            gone = [(i, p) for i, p, good in res if not good and not os.path.lexists(p)]
+            ok += gone
+            freed = sum(sizes.get(p, 0) for _i, p in ok)
+            remove_rows(ok)
+            if ok or not stuck:
                 notify(f"{len(ok)} itens {'movidos para o lixo' if trash else 'apagados'}"
-                       + (f" ({human_bytes(freed)})" if freed else "")
-                       + (f", {failed} falharam (sem permissão?)" if failed else ""), "warn" if failed else "ok")
+                       + (f" ({human_bytes(freed)})" if freed else ""), "ok")
             self._drives()
+            if stuck:
+                self._delete_elevated(stuck, trash, sizes, remove_rows)
         notify("A apagar…" if not trash else "A mover para o lixo…", "info")
         run_async(work, on_done=done)
+
+    def _delete_elevated(self, stuck, trash, sizes, remove_rows):
+        """Itens que falharam por falta de permissão: oferece apagá-los como administrador."""
+        names = "\n".join(_base(p) for _i, p in stuck[:10]) + ("\n…" if len(stuck) > 10 else "")
+        extra = ("\n\nNota: com permissões de administrador não é possível usar o Lixo — "
+                 "serão APAGADOS DEFINITIVAMENTE." if trash else "")
+        if IS_WIN and not is_admin():
+            if confirm(self, "Precisa de administrador",
+                       f"{len(stuck)} itens não foram apagados porque precisam de permissões de administrador:"
+                       f"\n\n{names}\n\nReabrir o Nexo como administrador? (depois volte a apagá-los)"):
+                if relaunch_as_admin():
+                    QApplication.quit()
+                else:
+                    notify("Não foi possível pedir permissões de administrador.", "bad")
+            return
+        how = "Será pedida a sua palavra-passe." if not IS_WIN else "O Nexo vai tomar posse dos ficheiros e apagá-los."
+        if not confirm(self, "Precisa de permissão",
+                       f"{len(stuck)} itens não foram apagados por falta de permissão:\n\n{names}\n\n"
+                       f"Apagar como administrador? {how}{extra}\n\nIsto não pode ser desfeito!"):
+            notify(f"{len(stuck)} itens não foram apagados (sem permissão).", "warn")
+            return
+        by_path = {p: i for i, p in stuck}
+
+        def done(res):
+            deleted, err = res
+            items = [(by_path[p], p) for p in deleted]
+            remove_rows(items)
+            freed = sum(sizes.get(p, 0) for p in deleted)
+            left = len(stuck) - len(deleted)
+            if deleted:
+                notify(f"{len(deleted)} itens apagados como administrador"
+                       + (f" ({human_bytes(freed)})" if freed else "")
+                       + (f", {left} continuam lá ({err})" if left else ""), "warn" if left else "ok")
+            else:
+                notify(f"Não foi possível apagar: {err or 'erro desconhecido'}", "bad")
+            self._drives()
+        notify("A apagar como administrador…", "info")
+        run_async(lambda: delete_as_admin([p for _i, p in stuck]), on_done=done)
 
     def retheme(self):
         """Volta a aplicar as cores das etiquetas depois de mudar de tema."""

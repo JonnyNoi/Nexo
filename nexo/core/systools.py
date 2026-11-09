@@ -16,6 +16,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 
+from . import snapshot
 from .util import _NO_WINDOW, IS_LINUX, IS_WIN, is_admin, ps_json, run, run_ps, run_root, which
 
 
@@ -51,12 +52,13 @@ def _out_ok(code: int, out: str, ok_msg: str = "Concluído") -> tuple[bool, str]
 
 
 # =========================================================================== Windows
-def win_restore_point() -> tuple[bool, str]:
+def win_restore_point(desc: str = "Nexo") -> tuple[bool, str]:
     # o Windows só deixa criar 1 ponto a cada 24 h — esta chave remove o limite
     run(["reg", "add", r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore", "/v",
          "SystemRestorePointCreationFrequency", "/t", "REG_DWORD", "/d", "0", "/f"], timeout=15)
     code, out = run_ps("Enable-ComputerRestore -Drive \"$env:SystemDrive\\\" -ErrorAction SilentlyContinue; "
-                       "Checkpoint-Computer -Description 'Nexo' -RestorePointType MODIFY_SETTINGS -ErrorAction Stop; "
+                       f"Checkpoint-Computer -Description '{desc.replace(chr(39), '')}' "
+                       "-RestorePointType MODIFY_SETTINGS -ErrorAction Stop; "
                        "'ok'", timeout=600)
     return (True, "Ponto de restauro criado (Painel de Controlo → Recuperação para voltar atrás).") \
         if code == 0 and "ok" in out else (False, out[-300:] or "Falhou")
@@ -271,12 +273,15 @@ def linux_orphans() -> tuple[bool, str]:
         pk = out.split() if code == 0 else []
         if not pk:
             return True, "Não há pacotes órfãos."
-        code, out = run_root("pacman -Rns --noconfirm " + " ".join(pk), timeout=900)
+        code, out = run_root(snapshot.with_snapshot("pacman -Rns --noconfirm " + " ".join(pk),
+                                                    "remover pacotes órfãos"), timeout=900)
         return _out_ok(code, out, f"{len(pk)} pacotes órfãos removidos")
     if pm == "apt":
-        return _out_ok(*run_root("apt-get -y autoremove --purge", timeout=900), "Pacotes sem uso removidos")
+        return _out_ok(*run_root(snapshot.with_snapshot("apt-get -y autoremove --purge", "remover pacotes órfãos"), timeout=900),
+                       "Pacotes sem uso removidos")
     if pm == "dnf":
-        return _out_ok(*run_root("dnf -y autoremove", timeout=900), "Pacotes sem uso removidos")
+        return _out_ok(*run_root(snapshot.with_snapshot("dnf -y autoremove", "remover pacotes órfãos"), timeout=900),
+                       "Pacotes sem uso removidos")
     if pm == "zypper":
         return _out_ok(*run_root("zypper --non-interactive rm -u $(zypper -q pa --unneeded | awk -F'|' 'NR>2{print $3}')",
                                  timeout=900), "Pacotes sem uso removidos")

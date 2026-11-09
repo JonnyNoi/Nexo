@@ -9,6 +9,7 @@ import glob
 import os
 import re
 
+from . import snapshot
 from .util import IS_LINUX, IS_WIN, is_admin, load_json, read_text, run, run_root, save_json, which
 
 BACKUP_FILE = "tweaks_backup.json"
@@ -206,7 +207,8 @@ class LinuxGovernor(Tweak):
             avail = read_text("/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors").split()
             if avail and target not in avail:
                 target = "schedutil" if "schedutil" in avail else avail[0]
-        code, out = run_root(f"for f in {_CPUFREQ}; do echo {target} > $f; done")
+        cmd = f"for f in {_CPUFREQ}; do echo {target} > $f; done"
+        code, out = run_root(snapshot.with_snapshot(cmd, f"ajuste: {self.name}") if on else cmd)
         if code == 0 and not on:
             self._backup_clear("gov")
         return code == 0, out or f"Governor: {target}"
@@ -260,7 +262,7 @@ class LinuxSysctl(Tweak):
             orig = self._backup_get("v") or self.value
             legacy = f"/etc/sysctl.d/99-pcforge-{self.id}.conf"  # nome antigo (PCForge)
             cmd = f"rm -f {self._conf()} {legacy} && sysctl -w {self.key}={orig}"
-        code, out = run_root(cmd)
+        code, out = run_root(snapshot.with_snapshot(cmd, f"ajuste: {self.name}") if on else cmd)
         if code == 0 and not on:
             self._backup_clear("v")
         return code == 0, out or "Feito"

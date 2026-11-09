@@ -502,6 +502,11 @@ class SettingRow(QWidget):
         d = label(desc, "Muted", wrap=True)
         col.addWidget(d)
         h.addLayout(col, 1)
+        if not isinstance(right, QWidget):   # aceita também um layout (vários controlos)
+            box = QWidget()
+            box.setObjectName("Transparent")
+            box.setLayout(right)
+            right = box
         h.addWidget(right, 0, Qt.AlignVCenter)
 
 
@@ -537,6 +542,9 @@ class SensorHub(QObject):
         self._csv_cols: list[str] = []
         self.csv_path: str | None = None
         self._alert_state: dict[str, float] = {}
+        self._ram_high = 0                  # segundos seguidos com a RAM acima do limite
+        from ..core.history import History
+        self.record = History()             # histórico em disco (média por minuto, 7 dias)
         self._stop = threading.Event()
         self._got_sig.connect(self._got, Qt.QueuedConnection)
         threading.Thread(target=self._loop, daemon=True, name="sensors").start()
@@ -591,16 +599,21 @@ class SensorHub(QObject):
                 mm[1] = r.value
         if self._csv_writer is not None:
             self._write_csv(readings)
+        from ..core.util import get_setting
+        if get_setting("history"):
+            self.record.add(snap)
         self._check_alerts(snap)
         self.updated.emit(readings)
 
     # ------------------------------------------------------------------ alertas
     def _check_alerts(self, snap):
         from ..core.util import get_setting
-        if not get_setting("alerts"):
-            return
         import time as _t
         now = _t.monotonic()
+        if get_setting("alert_ram"):
+            self._check_ram(snap.get("ram"), float(get_setting("alert_ram_pct") or 92), now)
+        if not get_setting("alerts"):
+            return
         for key, name, lim in (("cpu_temp", "CPU", get_setting("alert_cpu")),
                                ("gpu_temp", "GPU", get_setting("alert_gpu"))):
             v = snap.get(key)
@@ -614,6 +627,26 @@ class SensorHub(QObject):
                 self.alert.emit(f"Temperatura da {name} alta: {v:.0f} °C (limite {lim} °C)", "bad")
             elif v < lim - 5:
                 self._alert_state[key + "_armed"] = 1.0
+
+    RAM_SECONDS = 120
+
+    def _check_ram(self, v, lim: float, now: float):
+        """RAM acima do limite durante 2 minutos seguidos (picos curtos não contam);
+        volta a armar quando desce 5 pontos; no máximo 1 aviso / 10 min."""
+        if v is None:
+            return
+        if v >= lim:
+            self._ram_high += 1
+            if (self._ram_high == self.RAM_SECONDS and self._alert_state.get("ram_armed", 1.0)
+                    and now - self._alert_state.get("ram", -1e9) > 600):
+                self._alert_state["ram"] = now
+                self._alert_state["ram_armed"] = 0.0
+                self.alert.emit(f"Memória RAM quase cheia ({v:.0f} %) há 2 minutos. Feche programas que não "
+                                "estejam a ser usados (página Processos ou Otimização).", "warn")
+        else:
+            self._ram_high = 0
+            if v < lim - 5:
+                self._alert_state["ram_armed"] = 1.0
 
     # ------------------------------------------------------------------ CSV
     def start_csv(self, path: str) -> None:
@@ -654,3 +687,7 @@ class SensorHub(QObject):
     def close(self):
         self._stop.set()
         self.stop_csv()
+        try:
+            self.record.close()
+        except Exception:  # noqa: BLE001
+            logging.getLogger("nexo.history").exception("Falha a fechar o histórico")

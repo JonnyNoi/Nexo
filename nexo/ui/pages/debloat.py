@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QHBoxLayout, QHeaderView, QPushButton, QTableWidget, QTableWidgetItem,
                                QWidget)
 
-from ...core import debloat, tweaks
+from ...core import debloat, snapshot, tweaks
 from ...core.util import IS_WIN, is_admin, relaunch_as_admin
 from ..widgets import Card, Page, confirm, label, notify, run_async
 from .optimize import TweakList
@@ -123,17 +123,21 @@ class DebloatPage(Page):
         self.btn_remove.setEnabled(False)
 
         def work():
+            snap = snapshot.before("remover apps do Windows")
             res = []
             for a in sel:
                 ok, msg = debloat.remove(a.package, all_users=is_admin())
                 res.append((a.label, ok, msg))
-            return res
+            return snap, res
 
-        def done(res):
+        def done(out):
+            snap, res = out
             self.btn_remove.setEnabled(True)
             bad = [r for r in res if not r[1]]
+            snap_bad = bool(snap and not snap[0])
             notify(f"{len(res) - len(bad)} apps removidas" + (f", {len(bad)} falharam: " +
-                                                              ", ".join(r[0] for r in bad) if bad else ""),
-                   "warn" if bad else "ok")
+                                                              ", ".join(r[0] for r in bad) if bad else "")
+                   + (" (aviso: não foi possível criar o ponto de restauro)" if snap_bad else ""),
+                   "warn" if bad or snap_bad else "ok")
             self.load()
         run_async(work, on_done=done)

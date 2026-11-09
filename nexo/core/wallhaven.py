@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import json
 import os
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -24,10 +26,18 @@ SORTS = {"Mais populares": "toplist", "Relevância": "relevance", "Mais vistas":
          "Recentes": "date_added"}
 
 
-def _get(url: str, timeout: float = 20) -> bytes:
+def _get(url: str, timeout: float = 20, retries: int = 2) -> bytes:
+    """GET com novas tentativas: o wallhaven devolve 502/503/429 de vez em quando durante uns segundos."""
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 (URL https fixa)
-        return r.read()
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 (URL https fixa)
+                return r.read()
+        except urllib.error.HTTPError as e:
+            if attempt >= retries or not (e.code == 429 or e.code >= 500):
+                raise
+            time.sleep(1.5 * (attempt + 1) * (2 if e.code == 429 else 1))
+    raise RuntimeError("inalcançável")
 
 
 def search(query: str, sorting: str = "toplist", page: int = 1, min_res: str = "1920x1080",
