@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import glob
 import os
+import re
 from dataclasses import dataclass
 
 from .util import IS_LINUX, IS_WIN, read_text, run, run_root, which
@@ -36,6 +37,10 @@ PROFILES: dict[str, dict] = {
     "custom": {"name": "Personalizado", "desc": "A sua curva (arraste os pontos)", "curve": None, "power": None},
 }
 DEFAULT_CUSTOM = [(30, 25), (50, 35), (65, 55), (75, 75), (85, 100)]
+
+# perfis que podem ser usados automaticamente durante os jogos ("" = não mudar)
+GAME_PROFILES = ("silent", "balanced", "performance", "max", "custom")
+GAME_COOLDOWN_S = 60  # depois de fechar o jogo, o perfil mantém-se um pouco para arrefecer
 
 # módulos de kernel que expõem as ventoinhas da motherboard (Super I/O)
 SUPERIO_MODULES = ("nct6775", "it87", "nct6683", "asus_ec_sensors", "dell_smm_hwmon", "thinkpad_acpi")
@@ -195,6 +200,23 @@ def load_board_modules() -> tuple[bool, str]:
                    "'acpi_enforce_resources=lax' no arranque do kernel, ou não expõem o controlo ao sistema.")
 
 
+# outros programas que também controlam ventoinhas (os dois ao mesmo tempo "lutam" pela rotação)
+_OTHER_CONTROLLERS = {"lact": "LACT", "corectrl": "CoreCtrl", "coolercontrold": "CoolerControl",
+                      "coolercontrol": "CoolerControl", "fancontrol": "fancontrol", "thinkfan": "thinkfan",
+                      "nbfc_service": "NBFC", "fancontrol.exe": "FanControl", "argusmonitor.exe": "Argus Monitor"}
+
+
+def other_fan_controllers() -> list[str]:
+    """Nomes dos programas de controlo de ventoinhas que estão a correr."""
+    import psutil
+    found = set()
+    for proc in psutil.process_iter(["name"]):
+        n = (proc.info.get("name") or "").lower()
+        if n in _OTHER_CONTROLLERS:
+            found.add(_OTHER_CONTROLLERS[n])
+    return sorted(found)
+
+
 # ---------------------------------------------------------------------------------- perfil de energia
 _WIN_PLANS = {"power-saver": "a1841308-3541-4fab-bc81-f71556f20b4a",
               "balanced": "381b4222-f694-41f0-9685-ff5bb260df2e",
@@ -202,7 +224,25 @@ _WIN_PLANS = {"power-saver": "a1841308-3541-4fab-bc81-f71556f20b4a",
 POWER_NAMES = {"power-saver": "Poupança de energia", "balanced": "Equilibrado", "performance": "Desempenho"}
 
 
+def get_power_profile() -> str:
+    """Perfil de energia ativo ("power-saver" | "balanced" | "performance"; no Windows pode ser o GUID
+    de um plano próprio). "" se não for possível saber."""
+    if IS_LINUX and which("powerprofilesctl"):
+        code, out = run(["powerprofilesctl", "get"], timeout=10)
+        return out.strip() if code == 0 else ""
+    if IS_WIN:
+        code, out = run(["powercfg", "/getactivescheme"], timeout=10)
+        m = re.search(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", out, re.I) if code == 0 else None
+        if m:
+            guid = m.group(0).lower()
+            return next((k for k, v in _WIN_PLANS.items() if v == guid), guid)
+    return ""
+
+
 def set_power_profile(name: str) -> tuple[bool, str]:
+    if IS_WIN and re.fullmatch(r"[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}", name or "", re.I):
+        code, out = run(["powercfg", "/setactive", name], timeout=10)   # plano próprio do utilizador
+        return code == 0, out
     if IS_LINUX and which("powerprofilesctl"):
         code, out = run(["powerprofilesctl", "set", name], timeout=10)
         if code != 0 and name == "performance":

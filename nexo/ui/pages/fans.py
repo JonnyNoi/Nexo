@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QButtonGroup, QComboBox, QGridLayout, QHBoxLayout
 from ...core import fans as fc
 from ...core.util import IS_WIN, get_setting, set_setting
 from .. import theme
-from ..hwcontrol import SOURCES, fan_manager
+from ..hwcontrol import SOURCES, fan_manager, game_profile, set_game_profile
 from ..theme import qc
 from ..widgets import Card, Page, Tip, Toggle, confirm, label, notify, run_async, scaled
 
@@ -137,7 +137,10 @@ class CurveEditor(QWidget):
             p.setBrush(qc("warn"))
             p.drawEllipse(pt, 5, 5)
             p.setPen(qc("text"))
-            p.drawText(QRectF(pt.x() + 8, pt.y() - 22, 140, 18), Qt.AlignLeft,
+            # junto ao topo a etiqueta vai para baixo do ponto; perto da direita, para a esquerda
+            ty = pt.y() - 22 if pt.y() - 22 >= r.top() else pt.y() + 6
+            tx = pt.x() + 8 if pt.x() + 148 <= r.right() else pt.x() - 148
+            p.drawText(QRectF(tx, ty, 140, 18), Qt.AlignLeft if tx > pt.x() else Qt.AlignRight,
                        f"agora {self.temp:.0f}° → {pc:.0f}%")
         p.end()
 
@@ -182,16 +185,46 @@ class FansPage(Page):
         opts.setHorizontalSpacing(12)
         self.tg_power = Toggle(bool(get_setting("fan_power_sync")))
         self.tg_power.toggled.connect(lambda on: set_setting("fan_power_sync", on))
-        self.tg_game = Toggle(bool(get_setting("fan_game_boost")))
-        self.tg_game.toggled.connect(lambda on: set_setting("fan_game_boost", on))
+        self.tg_power.toggled.connect(lambda on: (set_setting("fan_power_sync", on), self.mgr.refresh_game()))
         opts.addWidget(self.tg_power, 0, 0)
         opts.addWidget(label("Mudar também o perfil de energia (Silencioso → poupança, Desempenho → desempenho)", wrap=True),
                        0, 1)
-        opts.addWidget(self.tg_game, 1, 0)
-        opts.addWidget(label("Passar a «Desempenho» enquanto um jogo estiver aberto (Modo jogo)", wrap=True), 1, 1)
         opts.setColumnStretch(1, 1)
         prof.add(opts)
         self.add(prof)
+
+        # ----------------------------------------------------------- jogos
+        gc = Card("Durante os jogos", "Quando o Modo jogo deteta um jogo, as ventoinhas mudam sozinhas de perfil. "
+                  f"Depois de fechar o jogo, o perfil mantém-se {fc.GAME_COOLDOWN_S} s para o PC arrefecer.",
+                  icon="gamepad")
+        grow = QHBoxLayout()
+        grow.addWidget(label("Perfil durante os jogos:"))
+        self.cb_game = self._profile_combo("Não mudar")
+        self.cb_game.currentIndexChanged.connect(
+            lambda _i: self._game_profile_changed(self.cb_game.currentData(), None))
+        grow.addWidget(self.cb_game)
+        grow.addStretch(1)
+        gc.add(grow)
+        # jogo aberto agora: perfil só para ele
+        self.cur_game = QWidget()
+        self.cur_game.setObjectName("Transparent")
+        crow = QHBoxLayout(self.cur_game)
+        crow.setContentsMargins(0, 0, 0, 0)
+        self.cur_game_lbl = label("")
+        self.cb_cur_game = self._profile_combo("Usar o geral")
+        self.cb_cur_game.currentIndexChanged.connect(
+            lambda _i: self._game_profile_changed(self.cb_cur_game.currentData(), self.mgr.game))
+        crow.addWidget(self.cur_game_lbl)
+        crow.addWidget(self.cb_cur_game)
+        crow.addStretch(1)
+        gc.add(self.cur_game)
+        # perfis guardados por jogo
+        self.per_game_title = label("Perfis próprios de jogos:", "Muted")
+        gc.add(self.per_game_title)
+        self.per_game = QGridLayout()
+        self.per_game.setHorizontalSpacing(12)
+        gc.add(self.per_game)
+        self.add(gc)
 
         # ----------------------------------------------------------- curva
         cc = Card("Curva", "Rotação em função da temperatura. No perfil Personalizado arraste os pontos.")
@@ -213,6 +246,7 @@ class FansPage(Page):
         self.add(self.list_card)
         self.body.addStretch(1)
         self.rows: dict[str, tuple] = {}
+        self._others: list[str] = []   # outros programas de ventoinhas a correr (LACT, CoolerControl…)
         self.mgr.changed.connect(self._rebuild)
         hub.updated.connect(self._update)
         self._rebuild()
@@ -220,6 +254,12 @@ class FansPage(Page):
     # ------------------------------------------------------------------
     def on_show(self):
         self._rebuild()
+
+        def found(names):
+            if names != self._others:
+                self._others = names
+                self._rebuild()
+        run_async(fc.other_fan_controllers, on_done=found, on_fail=lambda _m: None)
 
     def _rediscover(self):
         self.mgr.rediscover()
@@ -236,6 +276,53 @@ class FansPage(Page):
     def _curve_edited(self, pts):
         set_setting("fan_curve", [list(p) for p in pts])
         self._rebuild()
+
+    @staticmethod
+    def _profile_combo(none_label: str) -> QComboBox:
+        cb = QComboBox()
+        cb.addItem(none_label, "")
+        for k in fc.GAME_PROFILES:
+            cb.addItem(fc.PROFILES[k]["name"], k)
+        return cb
+
+    @staticmethod
+    def _select(cb: QComboBox, key: str):
+        cb.blockSignals(True)
+        cb.setCurrentIndex(max(0, cb.findData(key)))
+        cb.blockSignals(False)
+
+    def _game_profile_changed(self, key: str, game: str | None):
+        if key and fc.needs_access(self.mgr.fans):
+            notify("Primeiro permita o controlo das ventoinhas (botão em cima).", "warn")
+        set_game_profile(key, game)
+        self.mgr.refresh_game()
+        self._rebuild()
+
+    def _fill_games(self):
+        m = self.mgr
+        self._select(self.cb_game, game_profile(None))
+        self.cur_game.setVisible(bool(m.game))
+        if m.game:
+            per = (get_setting("fan_game_profiles") or {}).get(m.game, "")
+            state = " (fechado — a arrefecer)" if m.cooling else ""
+            self.cur_game_lbl.setText(f"Só para <b>{m.game}</b>{state}:")
+            self._select(self.cb_cur_game, per if per in fc.GAME_PROFILES else "")
+        g = self.per_game
+        while g.count():
+            w = g.takeAt(0).widget()
+            if w:
+                w.hide()
+                w.deleteLater()
+        per_game = {k: v for k, v in (get_setting("fan_game_profiles") or {}).items() if v in fc.GAME_PROFILES}
+        self.per_game_title.setVisible(bool(per_game))
+        for i, (name, key) in enumerate(sorted(per_game.items(), key=lambda kv: kv[0].lower())):
+            b = QPushButton("Esquecer")
+            b.setObjectName("Ghost")
+            b.clicked.connect(lambda _c, n=name: self._game_profile_changed("", n))
+            g.addWidget(label(name), i, 0)
+            g.addWidget(label(fc.PROFILES[key]["name"], "Muted"), i, 1)
+            g.addWidget(b, i, 2)
+        g.setColumnStretch(0, 1)
 
     def _grant(self):
         run_async(fc.grant_access, on_done=lambda r: (notify(r[1], "ok" if r[0] else "bad"), self.mgr.rediscover()))
@@ -283,6 +370,11 @@ class FansPage(Page):
                 b.clicked.connect(self._load_modules)
                 t.layout().addWidget(b, 0, Qt.AlignVCenter)
                 v.addWidget(t)
+            others = self._others
+            if others and (m.profile() != "auto" or game_profile(None) or get_setting("fan_game_profiles")):
+                v.addWidget(Tip(f"{' e '.join(others)} também está a controlar ventoinhas. Com os dois ativos, "
+                                "as rotações ficam a saltar — use só um (ou desligue em baixo as ventoinhas "
+                                f"que o {others[0]} controla).", "warn"))
             if m.error:
                 v.addWidget(Tip(m.error, "warn"))
         self.tips_lay.addWidget(col)
@@ -294,12 +386,14 @@ class FansPage(Page):
         eff = m.effective_profile()
         desc = fc.PROFILES[cur]["desc"]
         if eff != cur:
-            desc += " — neste momento em «Desempenho» porque há um jogo aberto."
+            why = "o jogo fechou há pouco e o PC está a arrefecer" if m.cooling else f"{m.game} está aberto"
+            desc += f" — neste momento em «{fc.PROFILES[eff]['name']}» porque {why}."
         self.prof_desc.setText(desc)
+        self._fill_games()
         for k, b in self.prof_btns.items():
             b.setObjectName("Primary" if k == cur else "")
             b.setStyle(b.style())
-        show = cur if cur != "auto" else "balanced"
+        show = eff if eff != "auto" else "balanced"
         self.curve.set_curve(m.curve(show) or fc.DEFAULT_CUSTOM, editable=(cur == "custom"))
         self.btn_reset_curve.setVisible(cur == "custom")
 

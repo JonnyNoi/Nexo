@@ -1037,15 +1037,20 @@ class MainWindow(QMainWindow):
             self._game_ended(old)
         self.game = g
         self.overlay.fps.set_game(g)
-        from .hwcontrol import existing_fan_manager, fan_manager
-        boost = bool(get_setting("fan_game_boost"))
-        if boost or existing_fan_manager() is not None:
-            fan_manager(self.hub).set_boost(g is not None and boost)
+        from .hwcontrol import existing_fan_manager, fan_manager, game_profile
+        from ..core.fans import PROFILES
+        fan_prof = game_profile(g.name) if g is not None else ""
+        if fan_prof or existing_fan_manager() is not None:
+            fan_manager(self.hub).set_game(g.name if g is not None else None)
         if g is not None:
             self.game_stats = {"cpu_max": None, "gpu_max": None, "start": g.started}
             if get_setting("game_notify"):
-                self._alert(f"🎮 Jogo detetado: {g.name}"
-                            + (" — overlay ligado" if get_setting("overlay_auto") else ""), "info")
+                extra = []
+                if get_setting("overlay_auto"):
+                    extra.append("overlay ligado")
+                if fan_prof:
+                    extra.append(f"ventoinhas em «{PROFILES[fan_prof]['name']}»")
+                self._alert(f"🎮 Jogo detetado: {g.name}" + (" — " + ", ".join(extra) if extra else ""), "info")
             if get_setting("overlay_auto") or self.overlay_manual:
                 self.overlay.show(g.name, g.started)
         elif not self.overlay_manual:
@@ -1128,7 +1133,7 @@ class MainWindow(QMainWindow):
         from .hwcontrol import existing_fan_manager
         fans = existing_fan_manager()
         if fans is not None:
-            fans.restore()   # as ventoinhas voltam ao controlo do hardware
+            fans.shutdown()   # ventoinhas para o hardware; energia como estava antes do jogo
         for p in self.pages:
             if p is not None and hasattr(p, "shutdown"):
                 p.shutdown()
