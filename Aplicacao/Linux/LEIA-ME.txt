@@ -1,0 +1,12 @@
+Nexo para Linux
+==================
+
+  Nexo       → o programa (ficheiro único, não precisa de Python nem de instalar nada).
+                   Abra com duplo clique ou no terminal:  ./Nexo
+  instalar.sh   → (opcional) copia para ~/.local/bin e cria o atalho no menu de aplicações:
+                   sh instalar.sh            (instalar)
+                   sh instalar.sh --remover  (desinstalar)
+
+Algumas ações (limpar memória, ajustes do sistema, atualizar o sistema) pedem a palavra-passe
+através do pkexec no momento em que são usadas.
+As definições ficam em ~/.config/Nexo.

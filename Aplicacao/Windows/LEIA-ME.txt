@@ -1,0 +1,14 @@
+Nexo para Windows
+====================
+
+  Nexo.exe   → o programa (ficheiro único, não precisa de Python nem de instalação).
+                   Abre a pedir permissões de administrador (necessárias para ajustes,
+                   debloat, reparações e funcionalidades do Windows).
+
+Funciona no Windows 10 e 11 (64 bits).
+O Windows SmartScreen pode avisar "o Windows protegeu o seu PC" porque o executável não tem
+assinatura digital: clique em "Mais informações" → "Executar mesmo assim".
+
+Para ler todos os sensores (temperaturas, ventoinhas, tensões) abra o LibreHardwareMonitor em
+segundo plano — pode instalá-lo na página "Instalar aplicações".
+As definições ficam em %APPDATA%\Nexo.
