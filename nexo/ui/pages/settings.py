@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QPushButton, QSpinBox
+import time
+
+from PySide6.QtWidgets import QComboBox, QFileDialog, QPushButton, QSpinBox
 
 from ...core import history, snapshot, startup
-from ...core.util import APP_NAME, APP_VERSION, config_dir, get_setting, open_path, set_setting
+from ...core.util import APP_NAME, APP_VERSION, config_dir, get_setting, human_bytes, open_path, set_setting
 from .. import theme
 from ..widgets import Card, Page, SettingRow, Toggle, confirm, hbox, label, notify, run_async, separator
 
@@ -83,6 +85,10 @@ class SettingsPage(Page):
         win.add(SettingRow("Abrir com o sistema", "Inicia o Nexo minimizado quando entra na sessão.", self.tg_auto))
         self.add(win)
 
+        self._build_autoclean()
+        self._build_backup()
+        self._build_selfupdate()
+
         # ---------------------------------------------------------------- dados / sobre
         about = Card("Dados e informação", icon="info")
         btn_dir = QPushButton("Abrir pasta de dados")
@@ -96,6 +102,178 @@ class SettingsPage(Page):
                         "F5 atualizar · Ctrl+, definições · Ctrl+Q sair", "Muted", wrap=True))
         self.add(about)
         self.body.addStretch(1)
+
+    # ------------------------------------------------------------------ limpeza automática
+    def _build_autoclean(self):
+        from ...core import autoclean
+        c = Card("Limpeza automática", "Limpa sozinho, de tempos a tempos, só o que se refaz sem custo e não precisa "
+                 "de palavra-passe. O Lixo, as caches dos navegadores e dos jogos ficam sempre para si decidir.",
+                 icon="broom")
+        self.cb_clean = QComboBox()
+        for days, txt in autoclean.INTERVALS.items():
+            self.cb_clean.addItem(txt, days)
+        self.cb_clean.setCurrentIndex(max(0, self.cb_clean.findData(int(get_setting("auto_clean_days") or 0))))
+        self.cb_clean.currentIndexChanged.connect(self._autoclean_changed)
+        names = ", ".join(x.name.lower() for x in autoclean.categories()) or "—"
+        self.lb_clean = label("", "Muted", wrap=True)
+        c.add(SettingRow("Frequência", f"Inclui: {names}.", self.cb_clean))
+        c.add(self.lb_clean)
+        self._autoclean_info()
+        self.add(c)
+
+    def _autoclean_changed(self, _i):
+        days = int(self.cb_clean.currentData() or 0)
+        set_setting("auto_clean_days", days)
+        if days and not get_setting("auto_clean_last"):
+            set_setting("auto_clean_last", time.time() - days * 86400)   # primeira limpeza no próximo ciclo
+        self._autoclean_info()
+
+    def _autoclean_info(self):
+        last = float(get_setting("auto_clean_last") or 0)
+        freed = int(get_setting("auto_clean_freed") or 0)
+        parts = []
+        if last and int(get_setting("auto_clean_days") or 0):
+            parts.append("Última limpeza: " + time.strftime("%d/%m/%Y %H:%M", time.localtime(last)))
+        if freed:
+            parts.append(f"total libertado: {human_bytes(freed)}")
+        self.lb_clean.setText(" · ".join(parts))
+        self.lb_clean.setVisible(bool(parts))
+
+    # ------------------------------------------------------------------ cópia das definições
+    def _build_backup(self):
+        c = Card("Cópia das definições", "Guarde as suas definições (perfis das ventoinhas, overlay, alertas, jogos "
+                 "marcados…), o histórico dos benchmarks e das sessões de jogo num ficheiro — para levar para outro "
+                 "PC ou repor depois de reinstalar.", icon="box")
+        b_exp = QPushButton("Exportar…")
+        b_exp.clicked.connect(self._export)
+        b_imp = QPushButton("Importar…")
+        b_imp.clicked.connect(self._import)
+        c.add(SettingRow("Ficheiro .zip", "A posição da janela e outras coisas desta máquina não são copiadas.",
+                         hbox(b_exp, b_imp)))
+        self.add(c)
+
+    def _export(self):
+        import os
+        from ...core import backup
+        name = f"nexo-definicoes-{time.strftime('%Y-%m-%d')}.zip"
+        path, _f = QFileDialog.getSaveFileName(self, "Exportar definições", os.path.join(os.path.expanduser("~"), name),
+                                               "Cópia do Nexo (*.zip)")
+        if not path:
+            return
+        run_async(backup.export, path, on_done=lambda p: notify(f"Definições exportadas para {p}", "ok"),
+                  on_fail=lambda m: notify(f"Não foi possível exportar: {m}", "bad"))
+
+    def _import(self):
+        import os
+        from ...core import backup
+        path, _f = QFileDialog.getOpenFileName(self, "Importar definições", os.path.expanduser("~"),
+                                               "Cópia do Nexo (*.zip)")
+        if not path:
+            return
+        try:
+            info = backup.read_backup(path)["manifest"]
+        except backup.ImportErrorNexo as e:
+            notify(str(e), "bad")
+            return
+        if not confirm(self, "Importar definições",
+                       f"Substituir as definições atuais pelas da cópia de {info.get('created', '?')} "
+                       f"({info.get('system', '?')})?\n\nAs atuais ficam guardadas em "
+                       "settings.json.antes-de-importar. O Nexo reinicia no fim."):
+            return
+        try:
+            res = backup.import_backup(path)
+        except backup.ImportErrorNexo as e:
+            notify(str(e), "bad")
+            return
+        notify(f"Importado: {res['settings']} definições, {res['bench']} benchmarks, {res['sessions']} sessões. "
+               "A reiniciar…", "ok")
+        win = self.window()
+        if hasattr(win, "restart_app"):
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(1200, win.restart_app)
+
+    # ------------------------------------------------------------------ atualizações do Nexo
+    def _build_selfupdate(self):
+        from ...core import selfupdate
+        c = Card("Atualizações do Nexo", f"Versão instalada: {APP_NAME} {APP_VERSION}.", icon="upgrade")
+        self.su_info = label("", "Muted", wrap=True)
+        self.su_check = QPushButton("Procurar agora")
+        self.su_check.clicked.connect(lambda: self._su_check(manual=True))
+        self.su_install = QPushButton("Instalar e reiniciar")
+        self.su_install.setObjectName("Primary")
+        self.su_install.setVisible(False)
+        self.su_install.clicked.connect(self._su_install)
+        c.add(SettingRow("Procurar versões novas sozinho", "Uma vez por dia, só com internet. Nada é instalado "
+                         "sem a sua autorização.", self._toggle("self_update_check")))
+        c.add(separator())
+        c.add(hbox(self.su_info, None, self.su_check, self.su_install))
+        self._su_rel = None
+        if not selfupdate.configured():
+            self.su_info.setText("Esta cópia do Nexo não tem um endereço de atualizações configurado.")
+            self.su_check.setEnabled(False)
+        self.add(c)
+
+    def show_release(self, rel):
+        """Chamado pela janela principal quando a verificação diária encontra uma versão nova."""
+        self._su_rel = rel
+        if rel is None:
+            self.su_info.setText("Tem a versão mais recente.")
+            self.su_install.setVisible(False)
+            return
+        notes = rel.notes.splitlines()
+        short = "<br>".join(n for n in notes[:8] if n.strip())
+        self.su_info.setText(f"<b>Versão {rel.version} disponível.</b>"
+                             + (f"<br>{short}" if short else "")
+                             + (f"<br><a href='{rel.url}'>Ver todas as novidades</a>" if rel.url else ""))
+        self.su_info.setOpenExternalLinks(True)
+        self.su_install.setVisible(True)
+
+    def _su_check(self, manual=False):
+        from ...core import selfupdate
+        from ..netmonitor import require_online
+        if not require_online("Procurar atualizações do Nexo"):
+            return
+        self.su_check.setEnabled(False)
+        self.su_info.setText("A procurar…")
+
+        def done(rel):
+            self.su_check.setEnabled(True)
+            set_setting("self_update_last", time.time())
+            self.show_release(rel)
+
+        def fail(m):
+            self.su_check.setEnabled(True)
+            from ...core.network import friendly_error
+            self.su_info.setText(f"Não foi possível procurar: {friendly_error(m)}")
+        run_async(selfupdate.check, on_done=done, on_fail=fail)
+
+    def _su_install(self):
+        from ...core import selfupdate
+        rel = self._su_rel
+        if rel is None:
+            return
+        if not selfupdate.frozen():
+            from PySide6.QtCore import QUrl
+            from PySide6.QtGui import QDesktopServices
+            QDesktopServices.openUrl(QUrl(rel.url))
+            notify("A correr a partir do código: atualize com git pull. Abri a página da versão.", "info")
+            return
+        if not confirm(self, "Atualizar o Nexo", f"Transferir e instalar o Nexo {rel.version}? O Nexo reinicia no fim."):
+            return
+        self.su_install.setEnabled(False)
+        self.su_info.setText("A transferir…")
+
+        def done(_p):
+            notify(f"Nexo {rel.version} instalado. A reiniciar…", "ok")
+            win = self.window()
+            if hasattr(win, "restart_app"):
+                win.restart_app()
+
+        def fail(m):
+            self.su_install.setEnabled(True)
+            self.su_info.setText(f"A atualização falhou: {m}")
+            notify(f"A atualização falhou: {m}", "bad")
+        run_async(selfupdate.install, rel, on_done=done, on_fail=fail)
 
     # ------------------------------------------------------------------ aparência
     def _build_appearance(self):
@@ -127,6 +305,13 @@ class SettingsPage(Page):
     def on_show(self):
         for k, b in self.theme_btns.items():
             b.setChecked(k == theme.current())
+        win = self.window()
+        rel = getattr(win, "_pending_release", None)
+        if rel is not None and self._su_rel is None:
+            self.show_release(rel)
+        if hasattr(win, "set_nav_badge"):
+            win.set_nav_badge("Definições", None)
+        self._autoclean_info()
 
     # ------------------------------------------------------------------
     def _toggle(self, key) -> Toggle:

@@ -567,6 +567,14 @@ class MainWindow(QMainWindow):
         self._watch_timer.timeout.connect(self._watch)
         self._watch_timer.start(5 * 60_000)
         QTimer.singleShot(45_000, self._watch)
+        # ------------------------------------------------------------- atualizações do próprio Nexo
+        from ..core import selfupdate
+        selfupdate.cleanup_old()
+        self._pending_release = None
+        self._su_timer = QTimer(self)
+        self._su_timer.timeout.connect(self._self_update_check)
+        self._su_timer.start(3 * 3600_000)
+        QTimer.singleShot(120_000, self._self_update_check)
         # ------------------------------------------------------------- ventoinhas
         # o gestor das ventoinhas só nasce se houver um perfil ativo (ou quando a página abre)
         if get_setting("fan_profile", "auto") != "auto":
@@ -773,8 +781,26 @@ class MainWindow(QMainWindow):
         if self.tray is not None and (not self.isVisible() or self.isMinimized() or not self.isActiveWindow()):
             self.tray.showMessage(APP_NAME, msg, QSystemTrayIcon.Warning, 8000)
 
+    def _auto_clean(self):
+        """Limpeza automática agendada (Definições → Limpeza automática)."""
+        from ..core import autoclean
+        if getattr(self, "_autoclean_busy", False) or not autoclean.due():
+            return
+        self._autoclean_busy = True
+
+        def done(res):
+            self._autoclean_busy = False
+            freed, msg = res
+            if freed:
+                self._alert("🧹 " + msg, "ok")
+
+        def fail(_m):
+            self._autoclean_busy = False
+        run_async(autoclean.run, on_done=done, on_fail=fail)
+
     def _watch(self):
         """A cada 5 min: espaço livre dos discos e alterações na cache do S.M.A.R.T. (sem pedir palavra-passe)."""
+        self._auto_clean()
         if self._watch_busy or not (get_setting("alert_disk") or get_setting("alert_smart")):
             return
         self._watch_busy = True
@@ -1101,6 +1127,40 @@ class MainWindow(QMainWindow):
             p = self.pages[self.names.index(name)]
             if p is not None and p.isVisible():
                 p.on_show()
+
+    def restart_app(self):
+        """Fecha e volta a abrir o Nexo (depois de atualizar ou importar definições)."""
+        from PySide6.QtCore import QProcess
+        from ..app import restart_command
+        prog, args = restart_command()
+        if QProcess.startDetached(prog, args):
+            self.quit()
+        else:
+            self.notify("Não foi possível reiniciar sozinho — feche e abra o Nexo.", "warn")
+
+    # ------------------------------------------------------------------ atualizações do próprio Nexo
+    def _self_update_check(self):
+        import time as _t
+        from ..core import selfupdate
+        from .netmonitor import monitor
+        if not (get_setting("self_update_check") and selfupdate.configured()) or monitor().online is False:
+            return
+        if _t.time() - float(get_setting("self_update_last") or 0) < 86400:
+            return
+
+        def done(rel):
+            set_setting("self_update_last", _t.time())
+            if rel is None or rel.version == get_setting("self_update_skip"):
+                return
+            name = "Definições"
+            if name in self.names:
+                self.set_nav_badge(name, "1", "accent")
+                p = self.pages[self.names.index(name)]
+                if p is not None and hasattr(p, "show_release"):
+                    p.show_release(rel)
+            self._pending_release = rel
+            self._alert(f"⬆ Nexo {rel.version} disponível — veja em Definições → Atualizações do Nexo.", "info")
+        run_async(selfupdate.check, on_done=done, on_fail=lambda _m: None)
 
     def _elevate(self):
         if relaunch_as_admin():

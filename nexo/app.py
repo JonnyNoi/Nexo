@@ -25,6 +25,10 @@ def main() -> int:
     app.setApplicationName(APP_NAME)
     app.setDesktopFileName("nexo")
 
+    # reinício pedido pelo próprio Nexo (atualização, importar definições): espera que o antigo feche
+    if "--wait-pid" in sys.argv:
+        _wait_pid(sys.argv)
+
     # instância única: se já houver um Nexo aberto, pede-lhe para aparecer e sai
     server_name = f"{APP_NAME}-single-instance"
     sock = QLocalSocket()
@@ -62,6 +66,29 @@ def main() -> int:
     code = app.exec()
     nlog.log.info("Nexo terminou (código %s)", code)
     return code
+
+
+def _wait_pid(argv: list[str], limit: float = 15.0) -> None:
+    import time
+    try:
+        pid = int(argv[argv.index("--wait-pid") + 1])
+    except (ValueError, IndexError):
+        return
+    import psutil
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < limit:
+        if not psutil.pid_exists(pid):
+            return
+        time.sleep(0.2)
+
+
+def restart_command() -> tuple[str, list[str]]:
+    """Comando para relançar o Nexo depois de este processo sair."""
+    import os
+    extra = ["--wait-pid", str(os.getpid())]
+    if getattr(sys, "frozen", False):
+        return sys.executable, extra
+    return sys.executable, ["-m", "nexo", *extra]
 
 
 if __name__ == "__main__":

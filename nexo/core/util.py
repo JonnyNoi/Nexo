@@ -15,7 +15,10 @@ IS_LINUX = sys.platform.startswith("linux")
 
 APP_NAME = "Nexo"
 LEGACY_NAME = "PCForge"  # nome antigo (para migrar definições)
-APP_VERSION = "2.0"
+APP_VERSION = "2.1"
+# repositório GitHub ("dono/nome") de onde o Nexo procura versões novas (releases com os ficheiros
+# "Nexo" e "Nexo.exe"). Vazio = sem verificação de atualizações do próprio Nexo.
+UPDATE_REPO = ""
 
 
 class TaskCancelled(Exception):
@@ -114,6 +117,14 @@ DEFAULT_SETTINGS = {
     "overlay_items": ["game", "fps", "cpu", "gpu", "ram", "vram", "clock"],
     "game_processes": [],            # nomes de processos que o utilizador marcou como jogo
     "game_notify": True,             # avisar quando um jogo começa/acaba (com resumo da sessão)
+    # limpeza automática (só categorias seguras e sem palavra-passe; ver core/autoclean.py)
+    "auto_clean_days": 0,            # 0 = desligada; 7, 14 ou 30
+    "auto_clean_last": 0,
+    "auto_clean_freed": 0,           # total libertado desde que foi ligada (bytes)
+    # atualizações do próprio Nexo
+    "self_update_check": True,
+    "self_update_last": 0,
+    "self_update_skip": "",          # versão que o utilizador mandou ignorar
 }
 _settings: dict | None = None
 
