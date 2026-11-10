@@ -570,6 +570,9 @@ class MainWindow(QMainWindow):
         # ------------------------------------------------------------- atualizações do próprio Nexo
         from ..core import selfupdate
         selfupdate.cleanup_old()
+        if IS_WIN and get_setting("lhm_autostart"):
+            from ..core import lhm
+            QTimer.singleShot(1500, lambda: run_async(lhm.start, on_fail=lambda _m: None))
         self._pending_release = None
         self._su_timer = QTimer(self)
         self._su_timer.timeout.connect(self._self_update_check)
@@ -1185,6 +1188,9 @@ class MainWindow(QMainWindow):
             self._save_session(self.game, wait=True)
         self.overlay.hide()
         self.overlay.fps.stop()
+        if IS_WIN:
+            from ..core import lhm
+            lhm.stop_if_started()
         from .hwcontrol import existing_fan_manager
         fans = existing_fan_manager()
         if fans is not None:

@@ -121,6 +121,8 @@ DEFAULT_SETTINGS = {
     "auto_clean_days": 0,            # 0 = desligada; 7, 14 ou 30
     "auto_clean_last": 0,
     "auto_clean_freed": 0,           # total libertado desde que foi ligada (bytes)
+    # Windows: abrir o LibreHardwareMonitor (instalado pelo Nexo) escondido quando o Nexo arranca
+    "lhm_autostart": True,
     # atualizações do próprio Nexo
     "self_update_check": True,
     "self_update_last": 0,

@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QButtonGroup, QFileDialog, QGridLayout, QHeaderVi
 from ...core.sensors import KIND_LABELS, pick, pick_cpu_temp, pick_gpu_temp, pick_power
 from ...core.util import IS_WIN, get_setting, set_setting
 from ..theme import qc
-from ..widgets import Bar, Card, Page, hbox, label, notify
+from ..widgets import Bar, Card, Page, SettingRow, Toggle, hbox, label, notify, run_async, separator
 
 GROUP_ORDER = ["CPU", "GPU", "GPU 2", "Memória", "Placa-mãe", "Disco", "Rede", "Bateria", "ACPI"]
 
@@ -180,6 +180,8 @@ class SensorsPage(Page):
         self.add(self.stack, 1)
         self.note = label("", "Muted", wrap=True)
         self.add(self.note)
+        if IS_WIN:
+            self._build_lhm()
         hub.updated.connect(self._update)
         hub.updated.connect(self._update_simple)
         view = {"all": 1, "history": 2}.get(get_setting("sensors_view", "simple"), 0)
@@ -360,6 +362,70 @@ class SensorsPage(Page):
         self.btn_csv.setStyle(self.btn_csv.style())
         notify("A gravar sensores a cada segundo (continua mesmo noutras páginas).", "info")
 
+    # ------------------------------------------------------------------ LibreHardwareMonitor (Windows)
+    def _build_lhm(self):
+        from ...core import lhm
+        c = Card("LibreHardwareMonitor", f"Lê os sensores que o Windows esconde (temperatura da CPU, ventoinhas, "
+                 f"tensões). Versão oficial {lhm.VERSION}, guardada na pasta do Nexo — sem instalador.", icon="thermo")
+        self.lhm_status = label(lhm.status_text(), "Muted", wrap=True)
+        self.lhm_btn = QPushButton("Instalar e abrir")
+        self.lhm_btn.setObjectName("Primary")
+        self.lhm_btn.clicked.connect(self._lhm_install)
+        self.lhm_rm = QPushButton("Remover")
+        self.lhm_rm.clicked.connect(self._lhm_remove)
+        c.add(hbox(self.lhm_status, None, self.lhm_rm, self.lhm_btn))
+        c.add(separator())
+        tg = Toggle(bool(get_setting("lhm_autostart")))
+        tg.clicked.connect(lambda on: set_setting("lhm_autostart", bool(on)))
+        c.add(SettingRow("Abrir com o Nexo", "Abre-o escondido na bandeja quando o Nexo arranca e fecha-o quando o "
+                         "Nexo sai.", tg))
+        self.add(c)
+        self._lhm_refresh()
+
+    def _lhm_refresh(self):
+        from ...core import lhm
+        self.lhm_status.setText(lhm.status_text())
+        inst, run_ = lhm.installed(), lhm.running()
+        self.lhm_btn.setText("Abrir agora" if inst else "Instalar e abrir")
+        self.lhm_btn.setVisible(not run_)
+        self.lhm_rm.setVisible(inst)
+
+    def _lhm_install(self):
+        from ...core import lhm
+        from ..netmonitor import require_online
+        if lhm.installed():
+            lhm.start()
+            notify("LibreHardwareMonitor aberto na bandeja — os sensores aparecem em alguns segundos.", "ok")
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(3000, self._lhm_refresh)
+            return
+        if not require_online("Transferir o LibreHardwareMonitor"):
+            return
+        self.lhm_btn.setEnabled(False)
+        self.lhm_status.setText("A transferir…")
+
+        def done(_p):
+            self.lhm_btn.setEnabled(True)
+            lhm.start()
+            notify("LibreHardwareMonitor instalado e aberto na bandeja.", "ok")
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(3000, self._lhm_refresh)
+
+        def fail(m):
+            self.lhm_btn.setEnabled(True)
+            self.lhm_status.setText(f"Não foi possível instalar: {m}")
+        run_async(lhm.install, on_done=done, on_fail=fail)
+
+    def _lhm_remove(self):
+        from ...core import lhm
+        from ..widgets import confirm
+        if lhm.running() and not confirm(self, "Remover", "Feche o LibreHardwareMonitor antes de o remover "
+                                         "(ícone na bandeja → Exit). Continuar mesmo assim?"):
+            return
+        lhm.remove()
+        self._lhm_refresh()
+        notify("LibreHardwareMonitor removido.", "ok")
+
     def on_show(self):
         if self.stack.currentIndex() == 2:
             self.hist.start()
@@ -443,9 +509,9 @@ class SensorsPage(Page):
             self.tree.setUpdatesEnabled(True)
         has_temp = any(r.kind == "temp" and r.group == "CPU" for r in readings)
         if not has_temp and IS_WIN:
-            note = ("Sem temperatura da CPU? O Windows não a expõe diretamente. Abra o "
-                    "LibreHardwareMonitor (gratuito) em segundo plano e o Nexo passa a ler todos os "
-                    "sensores dele automaticamente.")
+            note = ("Sem temperatura da CPU? O Windows não a expõe diretamente. Instale o LibreHardwareMonitor "
+                    "(gratuito, código aberto) com o botão abaixo — o Nexo abre-o escondido na bandeja e passa a "
+                    "ler todos os sensores dele (temperaturas, ventoinhas, tensões).")
         elif not has_temp:
             note = "Sem temperatura da CPU: carregue o módulo do sensor (coretemp/k10temp) ou instale lm_sensors."
         else:
