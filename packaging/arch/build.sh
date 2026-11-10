@@ -9,4 +9,4 @@ ver=$(sed -n 's/^APP_VERSION = "\(.*\)"/\1/p' "$repo/nexo/core/util.py")
 sed -i "s/^pkgver=.*/pkgver=$ver/" "$here/PKGBUILD"
 git -C "$repo" archive --format=tar.gz --prefix="nexo-$ver/" -o "$here/nexo-$ver.tar.gz" HEAD
 cd "$here"
-if [ "$1" = "--instalar" ]; then makepkg -fsi --noconfirm; else makepkg -f; fi
+if [ "$1" = "--instalar" ]; then makepkg -fsi --noconfirm; else makepkg -fd; fi   # -d: as dependências só contam ao instalar

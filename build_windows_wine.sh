@@ -3,6 +3,7 @@
 # (O PyInstaller não faz compilação cruzada; aqui corre o PyInstaller do Windows dentro do wine.)
 #   ./build_windows_wine.sh          → prepara o ambiente (só na 1.ª vez) e gera o .exe
 #   ./build_windows_wine.sh --setup  → só prepara o ambiente
+#   ./build_windows_wine.sh --instalador → gera o .exe e também o instalador (Inno Setup)
 cd "$(dirname "$0")" || exit 1
 command -v wine >/dev/null || { echo "Instale o wine primeiro (ex.: sudo pacman -S wine)."; exit 1; }
 
@@ -36,3 +37,22 @@ wine "$PY" -m PyInstaller --noconfirm --clean --onefile --windowed --uac-admin -
      --distpath 'Aplicacao\Windows' --workpath 'build\windows' --specpath 'build\windows' \
      run_nexo.py || exit 1
 echo "Pronto: Aplicacao/Windows/Nexo.exe"
+
+[ "$1" = "--instalador" ] || exit 0
+# ---------------------------------------------------------------- instalador (Inno Setup)
+ISVER=7.1.1
+ISSHA=8a5a6711c3766a6e5fb74f280ba0e3551e719ce94538d901fdbd1f8f9920b3f0
+ISCC="$WINEPREFIX/drive_c/InnoSetup/ISCC.exe"
+if [ ! -f "$ISCC" ]; then
+    echo "» A instalar o Inno Setup $ISVER no wine (só na 1.ª vez)…"
+    inst="$WINEPREFIX/innosetup-$ISVER-x64.exe"
+    [ -f "$inst" ] || curl -fL --retry 3 -o "$inst" \
+        "https://github.com/jrsoftware/issrc/releases/download/is-$(echo $ISVER | tr . _)/innosetup-$ISVER-x64.exe" || exit 1
+    echo "$ISSHA  $inst" | sha256sum -c --quiet || { rm -f "$inst"; echo "SHA-256 do Inno Setup não confere."; exit 1; }
+    wine "$inst" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /DIR='C:\InnoSetup' || exit 1
+    [ -f "$ISCC" ] || { echo "Falhou a instalação do Inno Setup."; exit 1; }
+fi
+VER=$(sed -n 's/^APP_VERSION = "\(.*\)"/\1/p' nexo/core/util.py)
+echo "» A gerar o instalador…"
+wine "$ISCC" /Q "/DAppVersion=$VER" 'packaging\windows\nexo.iss' || exit 1
+echo "Pronto: Aplicacao/Windows/Nexo-Instalador-$VER.exe"

@@ -256,7 +256,7 @@ class SettingsPage(Page):
             from PySide6.QtCore import QUrl
             from PySide6.QtGui import QDesktopServices
             QDesktopServices.openUrl(QUrl(rel.url))
-            notify("A correr a partir do código: atualize com git pull. Abri a página da versão.", "info")
+            notify("Este Nexo corre a partir do código ou do pacote do sistema: atualize com git pull ou com o gestor de pacotes. Abri a página da versão.", "info")
             return
         if not confirm(self, "Atualizar o Nexo", f"Transferir e instalar o Nexo {rel.version}? O Nexo reinicia no fim."):
             return
