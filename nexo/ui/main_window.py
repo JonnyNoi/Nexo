@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 
 from PySide6.QtCore import QByteArray, QEasingCurve, QPropertyAnimation, QRectF, QSize, Qt, QTimer, QVariantAnimation
@@ -13,7 +14,6 @@ from PySide6.QtWidgets import (QApplication, QBoxLayout, QButtonGroup, QFrame, Q
 from ..core.util import APP_NAME, APP_VERSION, IS_WIN, get_setting, is_admin, os_label, relaunch_as_admin, set_setting
 from . import theme
 from . import logo as logo_mod
-from .backgrounds import Backdrop
 from .icons import icon as make_icon
 from .icons import pixmap as icon_pixmap
 from .widgets import Bar, SensorHub, icon_badge, label, run_async, set_notify_target
@@ -371,8 +371,8 @@ class MainWindow(QMainWindow):
         self.hub = SensorHub()
         self._quitting = False
 
-        root = Backdrop()
-        self.backdrop = root
+        root = QWidget()
+        root.setObjectName("Root")
         h = QHBoxLayout(root)
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(0)
@@ -523,8 +523,8 @@ class MainWindow(QMainWindow):
         if geo:
             try:
                 self.restoreGeometry(QByteArray.fromBase64(geo.encode()))
-            except Exception:
-                pass
+            except (ValueError, TypeError, AttributeError):
+                logging.getLogger("nexo").debug("Geometria guardada inválida", exc_info=True)
 
         self.hub.updated.connect(self._live)
         self.hub.alert.connect(self._alert)
@@ -767,12 +767,6 @@ class MainWindow(QMainWindow):
         elif key.startswith(("wallpaper", "accent_")):
             theme.apply(QApplication.instance(), theme.current())  # a cor pode vir do fundo
             self._after_theme()
-        elif key.startswith(("bg_", "glass", "effect_")):
-            theme.restyle(QApplication.instance())
-            self.backdrop.reload()
-            self._sync_backdrop_pause()
-            for w in self.findChildren(QWidget):
-                w.update()
 
     def _alert(self, msg: str, kind: str):
         self.notify(msg, kind)
@@ -876,7 +870,6 @@ class MainWindow(QMainWindow):
         self._tray_text = "∅"  # força redesenhar o ícone da bandeja
         self.toast.hide()
         self.btn_search.setIcon(make_icon("search", theme.C["muted"]))
-        self.backdrop.reload()
         for pg in self.pages:
             if pg is not None and hasattr(pg, "retheme"):
                 pg.retheme()
@@ -985,25 +978,6 @@ class MainWindow(QMainWindow):
                 self._wp_busy = False
                 if force:
                     self.notify("Ainda não tem fundos guardados — escolha alguns no Wallhaven.", "info")
-
-    # ------------------------------------------------------------------ pausa do fundo animado
-    def _sync_backdrop_pause(self):
-        hidden = not self.isVisible() or self.isMinimized()
-        inactive = get_setting("bg_pause_inactive", True) and not self.isActiveWindow()
-        self.backdrop.set_paused(hidden or inactive)
-
-    def changeEvent(self, e):
-        super().changeEvent(e)
-        if e.type() in (e.Type.WindowStateChange, e.Type.ActivationChange):
-            QTimer.singleShot(0, self._sync_backdrop_pause)
-
-    def showEvent(self, e):
-        super().showEvent(e)
-        QTimer.singleShot(0, self._sync_backdrop_pause)
-
-    def hideEvent(self, e):
-        super().hideEvent(e)
-        self.backdrop.set_paused(True)
 
     # ------------------------------------------------------------------ modo jogo
     def _check_game(self):

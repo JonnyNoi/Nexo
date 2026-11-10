@@ -10,6 +10,7 @@ from PySide6.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPai
 from PySide6.QtWidgets import (QAbstractButton, QFrame, QHBoxLayout, QLabel, QMessageBox, QScrollArea,
                                QSizePolicy, QVBoxLayout, QWidget)
 
+from ..core.util import TaskCancelled
 from . import theme
 from .theme import qc
 
@@ -38,6 +39,9 @@ class Task(QObject):
     def _run(self):
         try:
             self.done.emit(self._fn(*self._args, **self._kw))
+        except TaskCancelled as e:
+            logging.getLogger("nexo.task").info("Tarefa %s cancelada", getattr(self._fn, "__qualname__", self._fn))
+            self.failed.emit(f"{type(e).__name__}: {e}")
         except Exception as e:  # noqa: BLE001
             logging.getLogger("nexo.task").exception("Tarefa %s falhou", getattr(self._fn, "__qualname__", self._fn))
             self.failed.emit(f"{type(e).__name__}: {e}")

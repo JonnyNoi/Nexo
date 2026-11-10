@@ -51,7 +51,7 @@ def _cpu_section_linux() -> Section:
                                ("Socket(s)", "Sockets")):
                 if data.get(key):
                     rows.append((label, data[key]))
-        except Exception:
+        except (ValueError, KeyError, TypeError):
             pass
     gov = read_text("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor")
     if gov:

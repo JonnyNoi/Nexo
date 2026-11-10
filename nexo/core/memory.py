@@ -146,6 +146,6 @@ def terminate(pids: list[int]) -> int:
     for p in alive:
         try:
             p.kill()
-        except Exception:
+        except psutil.Error:
             pass
     return len(procs)

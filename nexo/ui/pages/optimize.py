@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QHBoxLayout, QHeaderView, QPushButton, QTableWidget, QTableWidgetItem,
                                QWidget)
@@ -40,7 +42,8 @@ class TweakList(Card):
             for t, _ in self.toggles:
                 try:
                     out.append(bool(t.is_on()))
-                except Exception:
+                except Exception:  # noqa: BLE001
+                    logging.getLogger("nexo.optimize").debug("Estado do ajuste ilegível", exc_info=True)
                     out.append(False)
             return out
 

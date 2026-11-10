@@ -17,6 +17,10 @@ APP_NAME = "Nexo"
 LEGACY_NAME = "PCForge"  # nome antigo (para migrar definições)
 APP_VERSION = "2.0"
 
+
+class TaskCancelled(Exception):
+    """Cancelamento pedido pelo utilizador: não é um erro (não vai para o nexo.log como ERROR)."""
+
 # No Windows, evita que cada subprocesso abra uma janela de consola.
 _NO_WINDOW = 0x08000000 if IS_WIN else 0
 
@@ -43,7 +47,15 @@ def load_json(name: str, default):
     p = config_dir() / name
     try:
         return json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+    except FileNotFoundError:
+        return default
+    except Exception:  # noqa: BLE001 — ficheiro corrompido: guardar uma cópia antes que seja reescrito
+        import logging
+        logging.getLogger("nexo.config").warning("%s ilegível — copiado para %s.corrompido", name, name, exc_info=True)
+        try:
+            shutil.copy2(p, p.with_name(p.name + ".corrompido"))
+        except OSError:
+            pass
         return default
 
 
@@ -72,16 +84,7 @@ def save_json(name: str, data) -> None:
 DEFAULT_SETTINGS = {
     "theme": "escuro",
     # aparência / fundo
-    "bg_effects": False,         # efeito animado do tema (Cyberpunk, Matrix…)
-    "bg_animate": True,          # animar (desligado = imagem parada)
-    "bg_fps": 24,
-    "bg_pause_inactive": True,   # pausa quando a janela não está ativa (poupa CPU/GPU)
-    "glass_opacity": 85,         # opacidade dos cartões por cima do fundo (%)
     "wallpaper": "",             # imagem, GIF ou vídeo
-    "wallpaper_dim": 55,         # escurecer o fundo (%)
-    "wallpaper_blur": 0,         # 0–3
-    "wallpaper_motion": True,    # imagens estáticas deslizam devagar
-    "effect_over_wallpaper": False,
     "accent_from_wallpaper": False,  # cor de destaque tirada do fundo
     "wp_auto": 0,                    # troca automática do fundo (minutos; 0 = desligada)
     "wp_auto_source": "local",       # "local" (os meus fundos) | "wallhaven"
@@ -170,7 +173,7 @@ def run(cmd: list[str] | str, timeout: float = 30, shell: bool = False) -> tuple
 def read_text(path: str | Path, default: str = "") -> str:
     try:
         return Path(path).read_text(encoding="utf-8", errors="replace").strip()
-    except Exception:
+    except (OSError, ValueError):  # sysfs/proc: ficheiros que desaparecem ou não se deixam ler são normais
         return default
 
 
@@ -196,7 +199,9 @@ def ps_json(script: str, timeout: float = 60):
         # pode haver lixo antes do JSON (avisos); procura o primeiro { ou [
         i = min([x for x in (out.find("{"), out.find("[")) if x >= 0], default=0)
         return json.loads(out[i:])
-    except Exception:
+    except ValueError:
+        import logging
+        logging.getLogger("nexo.ps").debug("Saída do PowerShell não é JSON: %.300s", out)
         return None
 
 
@@ -212,7 +217,7 @@ def is_admin() -> bool:
         try:
             import ctypes
             return bool(ctypes.windll.shell32.IsUserAnAdmin())
-        except Exception:
+        except (OSError, AttributeError):
             return False
     return os.geteuid() == 0
 

@@ -46,7 +46,7 @@ def _read_desktop(path: Path) -> dict:
     try:
         cp.read(path, encoding="utf-8")
         return dict(cp["Desktop Entry"]) if cp.has_section("Desktop Entry") else {}
-    except Exception:
+    except (OSError, UnicodeError, configparser.Error):
         return {}
 
 

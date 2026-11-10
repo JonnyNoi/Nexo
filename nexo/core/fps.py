@@ -10,6 +10,7 @@ Fontes, por ordem:
 from __future__ import annotations
 
 import collections
+import hashlib
 import os
 import re
 import subprocess
@@ -148,6 +149,9 @@ def _read_rtss(pid: int) -> tuple[float, float] | None:
 
 # ============================================================================================ Windows: PresentMon
 PRESENTMON_URL = "https://github.com/GameTechDev/PresentMon/releases/download/v2.6.0/PresentMon-2.6.0-x64.exe"
+# SHA-256 publicado pelo GitHub para este ficheiro da release v2.6.0 — o Nexo corre como administrador no
+# Windows e executa este programa, por isso só aceita exatamente este binário.
+PRESENTMON_SHA256 = "b2a706bc6ad475749e3b7e3409263aa1e6906d45bdcf993f6dbc0f660188f1af"
 _IGNORE_APPS = {"dwm.exe", "explorer.exe", "nexo.exe", "python.exe", "pythonw.exe", "presentmon.exe",
                 "steamwebhelper.exe", "msedgewebview2.exe", "chrome.exe", "firefox.exe", "msedge.exe"}
 
@@ -156,9 +160,32 @@ def presentmon_path() -> Path:
     return config_dir() / "ferramentas" / "PresentMon.exe"
 
 
+_pm_ok_cache: dict = {}
+
+
 def presentmon_installed() -> bool:
+    """Só conta o binário oficial (mesmo SHA-256). Resultado guardado por (tamanho, mtime) — é chamado em ciclo."""
     p = presentmon_path()
-    return p.is_file() and p.stat().st_size > 200_000
+    try:
+        st = p.stat()
+    except OSError:
+        return False
+    key = (st.st_size, st.st_mtime_ns)
+    if key not in _pm_ok_cache:
+        _pm_ok_cache.clear()
+        _pm_ok_cache[key] = file_sha256(p) == PRESENTMON_SHA256
+    return _pm_ok_cache[key]
+
+
+def file_sha256(path) -> str:
+    h = hashlib.sha256()
+    try:
+        with open(path, "rb") as f:
+            while chunk := f.read(1 << 20):
+                h.update(chunk)
+    except OSError:
+        return ""
+    return h.hexdigest()
 
 
 def install_presentmon() -> str:
@@ -168,13 +195,15 @@ def install_presentmon() -> str:
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(".part")
     req = urllib.request.Request(PRESENTMON_URL, headers={"User-Agent": "Nexo"})
+    h = hashlib.sha256()
     with urllib.request.urlopen(req, timeout=60) as r, open(tmp, "wb") as f:  # noqa: S310 (URL https fixa)
         while chunk := r.read(65536):
             f.write(chunk)
-    with open(tmp, "rb") as f:
-        if f.read(2) != b"MZ" or tmp.stat().st_size < 200_000:
-            tmp.unlink(missing_ok=True)
-            raise RuntimeError("O ficheiro transferido não é um executável válido.")
+            h.update(chunk)
+    if h.hexdigest() != PRESENTMON_SHA256:
+        tmp.unlink(missing_ok=True)
+        raise RuntimeError("O ficheiro transferido não corresponde ao PresentMon oficial (verificação SHA-256 "
+                           "falhou). Não foi instalado.")
     os.replace(tmp, dest)
     return str(dest)
 

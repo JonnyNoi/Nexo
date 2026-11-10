@@ -68,7 +68,7 @@ def end(pids: list[int], force: bool = False) -> tuple[int, list[str]]:
         for p in alive:
             try:
                 p.kill()
-            except Exception:
+            except psutil.Error:
                 pass
     return len(procs), errors
 

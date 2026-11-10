@@ -44,11 +44,6 @@ def logo_colors() -> tuple[str, str]:
     return C["accent"], C["accent2"]
 
 
-def backdrop_active() -> bool:
-    """Sem fundos na interface: a aplicação usa só as cores do tema."""
-    return False
-
-
 def qc(name: str, alpha: int | None = None) -> QColor:
     c = QColor(C[name])
     if alpha is not None:
@@ -77,18 +72,7 @@ def stylesheet() -> str:
     from .icons import svg_file
     c = dict(C)
     check = svg_file("check", c["accent_text"])
-    glass = backdrop_active()
-    op = max(0.35, min(0.97, get_setting("glass_opacity", 85) / 100))
-    if glass:  # interface translúcida por cima do fundo animado / imagem
-        base_bg = "transparent"
-        card = _rgba(c["surface"], op)
-        side = _rgba(c["surface"], min(0.97, op + 0.08))
-        field = _rgba(c["surface2"], min(0.97, op + 0.1))
-        table = _rgba(c["surface"], max(0.2, op - 0.25))
-        alt = _rgba(c["surface2"], max(0.25, op - 0.2))
-    else:
-        base_bg, card, side, field, table, alt = c["bg"], c["surface"], c["surface"], c["surface2"], c["surface"], \
-            c["surface2"]
+    base_bg, field, table, alt = c["bg"], c["surface2"], c["surface"], c["surface2"]
     light = bool(c.get("light"))
     card_top = _mix(c["surface"], c["accent"], 0.035 if not light else 0.012)
     card_bot = c["surface"] if light else _mix(c["surface"], c["bg"], 0.35)
@@ -96,13 +80,11 @@ def stylesheet() -> str:
     glow2 = _rgba(c["accent2"], 0.06 if not light else 0.04)
     nav_on = _rgba(c["accent"], 0.22 if not light else 0.12)
     nav_off = _rgba(c["accent"], 0.03)
-    if not glass:
-        card = f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {card_top}, stop:1 {card_bot})"
-        side = f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {_mix(c['surface'], c['accent'], 0.04)}, stop:1 {c['surface']})"
-        page_bg = (f"qradialgradient(cx:0.92, cy:0.0, radius:1.1, fx:0.92, fy:0.0, stop:0 {glow}, stop:0.45 {glow2}, "
-                   f"stop:1 {c['bg']})")
-    else:
-        page_bg = base_bg
+    # cartões e menu com um gradiente subtil (sem fundos animados por baixo)
+    card = f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {card_top}, stop:1 {card_bot})"
+    side = f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {_mix(c['surface'], c['accent'], 0.04)}, stop:1 {c['surface']})"
+    page_bg = (f"qradialgradient(cx:0.92, cy:0.0, radius:1.1, fx:0.92, fy:0.0, stop:0 {glow}, stop:0.45 {glow2}, "
+               f"stop:1 {c['bg']})")
     return f"""
 * {{ font-size: 13px; outline: none; }}
 QWidget {{ background: {base_bg}; color: {c['text']}; }}

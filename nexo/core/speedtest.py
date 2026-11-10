@@ -15,7 +15,7 @@ import threading
 import time
 from dataclasses import asdict, dataclass, field
 
-from .util import APP_NAME, APP_VERSION, get_setting, set_setting
+from .util import APP_NAME, APP_VERSION, get_setting, set_setting, TaskCancelled
 
 HOST = "speed.cloudflare.com"
 UA = f"{APP_NAME}/{APP_VERSION}"
@@ -31,7 +31,7 @@ _COLOS = {"LIS": "Lisboa", "OPO": "Porto", "MAD": "Madrid", "BCN": "Barcelona", 
           "IAD": "Ashburn", "MIA": "Miami", "LAX": "Los Angeles"}
 
 
-class Cancelled(Exception):
+class Cancelled(TaskCancelled):
     pass
 
 

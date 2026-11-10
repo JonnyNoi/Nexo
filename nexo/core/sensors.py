@@ -95,7 +95,7 @@ class SensorReader:
             if p is not None:
                 try:
                     p.kill()
-                except Exception:
+                except OSError:
                     pass
 
     # ------------------------------------------------------------------ geral
@@ -117,7 +117,7 @@ class SensorReader:
                 cur = [f.current for f in freqs]
                 out.append(Reading("CPU", "Clock médio", sum(cur) / len(cur), "MHz", "freq"))
                 out.append(Reading("CPU", "Clock máximo", max(cur), "MHz", "freq"))
-        except Exception:
+        except (OSError, RuntimeError, NotImplementedError, ValueError):
             pass
 
         vm = psutil.virtual_memory()
@@ -339,7 +339,7 @@ class SensorReader:
                     batch = []
             try:
                 p.kill()
-            except Exception:
+            except OSError:
                 pass
             self._nv_cache = []
             self._stop.wait(5.0)  # se o processo morrer, tenta de novo daqui a pouco
@@ -418,7 +418,7 @@ $o
                     continue
             try:
                 p.kill()
-            except Exception:
+            except OSError:
                 pass
             self._stop.wait(3.0)
 
