@@ -4,13 +4,13 @@ from __future__ import annotations
 import time
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QGridLayout, QHeaderView, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
+from PySide6.QtWidgets import (QComboBox, QGridLayout, QHeaderView, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
                                QWidget)
 
 from ...core import smart
 from ...core.util import IS_WIN, human_bytes, human_duration
 from .. import theme
-from ..widgets import Bar, Card, Page, Tip, hbox, icon_badge, label, notify, run_async, separator, status_dot
+from ..widgets import Bar, Card, StatTile, Task, Page, Tip, hbox, icon_badge, label, notify, run_async, separator, status_dot
 
 VERDICT = {"ok": ("Bom", "check"), "warn": ("Atenção", "alert"), "bad": ("Mau", "alert"),
            "unknown": ("Sem dados", "info")}
@@ -50,6 +50,8 @@ class DiskHealthPage(Page):
         self.list_lay.setSpacing(16)
         self.add(self.list_holder)
 
+        self._build_bench()
+
         help_ = Card("Como ler isto", icon="info")
         help_.add(label(
             "• <b>Vida restante</b>: os SSD aguentam um número limitado de escritas; 100% é novo. Abaixo de 10% "
@@ -66,8 +68,127 @@ class DiskHealthPage(Page):
         self._busy = False
         self._shown_time = None
 
+    # ------------------------------------------------------------------ velocidade
+    def _build_bench(self):
+        from ...core import diskbench as db
+        c = Card("Velocidade do disco", "Mede a leitura e a escrita a sério (sem a cache da memória): sequencial "
+                 "(ficheiros grandes, cópias) e aleatória de 4 KiB (abrir programas e jogos).", icon="gauge")
+        self.bench_target = QComboBox()
+        self.bench_target.setMinimumWidth(320)
+        self.bench_size = QComboBox()
+        for txt, mib in (("256 MiB (rápido)", 256), ("1 GiB", 1024), ("4 GiB (mais preciso)", 4096)):
+            self.bench_size.addItem(txt, mib * db.MiB)
+        self.bench_size.setCurrentIndex(1)
+        self.btn_bench = QPushButton("Testar velocidade")
+        self.btn_bench.setObjectName("Primary")
+        self.btn_bench.clicked.connect(self._bench_toggle)
+        c.add(hbox(self.bench_target, self.bench_size, None, self.btn_bench))
+        self.bench_bar = Bar()
+        self.bench_bar.setVisible(False)
+        c.add(self.bench_bar)
+        grid = QGridLayout()
+        grid.setSpacing(12)
+        self.bench_tiles = {}
+        for i, (k, t) in enumerate((("seq_read", "Leitura sequencial"), ("seq_write", "Escrita sequencial"),
+                                    ("rnd_read", "Leitura aleatória 4K"), ("rnd_write", "Escrita aleatória 4K"))):
+            tile = StatTile(t, "—", "MB/s")
+            self.bench_tiles[k] = tile
+            grid.addWidget(tile, 0, i)
+        w = QWidget()
+        w.setObjectName("Transparent")
+        w.setLayout(grid)
+        c.add(w)
+        self.bench_info = label("Escreve um ficheiro temporário no disco escolhido e apaga-o no fim. Feche "
+                                "programas que estejam a usar o disco para resultados mais fiéis.", "Muted", wrap=True)
+        c.add(self.bench_info)
+        self.add(c)
+        self._bench_task = None
+        self._bench_stop = None
+        self._bench_targets_loaded = False
+
+    def _load_bench_targets(self):
+        from ...core import diskbench as db
+
+        def done(ts):
+            self.bench_target.clear()
+            for lbl, where, free in ts:
+                self.bench_target.addItem(f"{lbl} — {human_bytes(free)} livres", where)
+            self.btn_bench.setEnabled(bool(ts))
+            if not ts:
+                self.bench_info.setText("Não encontrei nenhum disco onde seja possível escrever.")
+        run_async(db.targets, on_done=done)
+
+    def _bench_toggle(self):
+        import threading
+        from ...core import diskbench as db
+        if self._bench_task is not None:
+            self._bench_stop.set()
+            self.btn_bench.setEnabled(False)
+            return
+        folder = self.bench_target.currentData()
+        if not folder:
+            return
+        self._bench_stop = threading.Event()
+        for t in self.bench_tiles.values():
+            t.set("—", "MB/s")
+        self.bench_bar.set(0)
+        self.bench_bar.setVisible(True)
+        self.btn_bench.setText("Cancelar")
+        self.bench_info.setText("A testar… (não use o disco entretanto)")
+        holder: dict = {}
+        size = self.bench_size.currentData()
+        stop = self._bench_stop
+        t = Task(lambda: db.run(folder, size, lambda *a: holder["t"].progress.emit(a), stop))
+        holder["t"] = t
+        t.progress.connect(self._bench_progress)
+        t.done.connect(self._bench_done)
+        t.failed.connect(self._bench_failed)
+        self._bench_task = t
+        t.start()
+
+    _PHASES = ("seq_write", "seq_read", "rnd_read", "rnd_write")
+
+    def _bench_progress(self, ev):
+        phase, frac, mbs = ev
+        i = self._PHASES.index(phase)
+        self.bench_bar.set((i + frac) / len(self._PHASES) * 100)
+        self.bench_tiles[phase].set(f"{mbs:,.0f}".replace(",", " "), "MB/s · a medir…", "accent")
+
+    def _bench_reset(self):
+        self._bench_task = None
+        self.btn_bench.setEnabled(True)
+        self.btn_bench.setText("Testar velocidade")
+        self.bench_bar.setVisible(False)
+
+    def _bench_done(self, r):
+        from ...core import diskbench as db
+        self._bench_reset()
+        fmt = lambda v: f"{v:,.0f}".replace(",", " ") if v >= 10 else f"{v:.1f}"  # noqa: E731
+        self.bench_tiles["seq_read"].set(fmt(r.seq_read), "MB/s")
+        self.bench_tiles["seq_write"].set(fmt(r.seq_write), "MB/s")
+        self.bench_tiles["rnd_read"].set(fmt(r.rnd_read), f"MB/s · {r.rnd_read_iops:,.0f} IOPS".replace(",", " "))
+        self.bench_tiles["rnd_write"].set(fmt(r.rnd_write), f"MB/s · {r.rnd_write_iops:,.0f} IOPS".replace(",", " "))
+        self.bench_info.setText(db.verdict(r) + ("  " + " ".join(r.notes) if r.notes else ""))
+
+    def _bench_failed(self, msg):
+        self._bench_reset()
+        if msg.startswith("Cancelled"):
+            self.bench_info.setText("Teste cancelado (o ficheiro temporário foi apagado).")
+            for t in self.bench_tiles.values():
+                t.set("—", "MB/s")
+        else:
+            self.bench_info.setText(f"O teste falhou: {msg}")
+            notify(f"Teste de velocidade do disco falhou: {msg}", "bad")
+
+    def shutdown(self):
+        if self._bench_stop is not None:
+            self._bench_stop.set()
+
     # ------------------------------------------------------------------
     def on_show(self):
+        if not self._bench_targets_loaded:
+            self._bench_targets_loaded = True
+            self._load_bench_targets()
         self.install_row.setVisible(not smart.smartctl_path())
         data = smart.cached()
         if data and data.get("time") != self._shown_time:

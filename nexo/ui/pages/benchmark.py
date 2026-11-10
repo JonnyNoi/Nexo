@@ -4,7 +4,7 @@ import multiprocessing as mp
 import os
 import time
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QProcess, Qt
 from PySide6.QtGui import QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QHeaderView, QLabel, QProgressBar, QPushButton, QSizePolicy,
                                QTableWidget, QTableWidgetItem)
@@ -47,8 +47,9 @@ class BenchView(QLabel):
 
 class BenchmarkPage(Page):
     def __init__(self):
-        super().__init__("Benchmark de CPU", "Path tracer próprio (iluminação global, reflexos, vidro com refração). "
-                                             "Imagem sempre igual — a nota mede só a velocidade da CPU.")
+        super().__init__("Benchmark", "CPU: path tracer próprio (iluminação global, reflexos, vidro com refração). "
+                                      "Placa gráfica: cena 3D em OpenGL. Imagens sempre iguais — as notas comparam-se "
+                                      "entre PCs.")
         self.running = False
         self.pool = None
 
@@ -95,9 +96,11 @@ class BenchmarkPage(Page):
         body.addLayout(side, 1)
         self.add(body, 1)
 
+        self._build_gpu()
+
         hist = Card("Histórico")
         self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Data", "Modo", "Qualidade", "Nota", "CPU"])
+        self.table.setHorizontalHeaderLabels(["Data", "Modo", "Qualidade", "Nota", "Processador / placa"])
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -195,11 +198,133 @@ class BenchmarkPage(Page):
         self.t_time.set(f"{el:.1f} s", f"{samples / 1e6:.1f} M amostras")
         hist = load_json("bench_history.json", [])
         hist.append({"date": time.strftime("%Y-%m-%d %H:%M"), "score": score, "cpu": cpu_model(), **meta})
-        save_json("bench_history.json", hist[-20:])
+        save_json("bench_history.json", hist[-30:])
         self._load_history()
         notify(f"Benchmark {meta['mode']}: {score:.0f} pontos", "ok")
 
+    # ------------------------------------------------------------------ placa gráfica
+    def _build_gpu(self):
+        from ...core import gpubench
+        c = Card("Placa gráfica", "Cena 3D com ray marching (sombras suaves, oclusão ambiente, reflexos) desenhada "
+                 "pela GPU durante 15 s. Nota = FPS × 10.", icon="gauge")
+        self.gpu_res = QComboBox()
+        for k in gpubench.RESOLUTIONS:
+            self.gpu_res.addItem(k, k)
+        self.gpu_btn = QPushButton("Testar placa gráfica")
+        self.gpu_btn.setObjectName("Primary")
+        self.gpu_btn.clicked.connect(self._gpu_toggle)
+        row = QHBoxLayout()
+        row.addWidget(label("Resolução"))
+        row.addWidget(self.gpu_res)
+        row.addStretch(1)
+        row.addWidget(self.gpu_btn)
+        c.add(row)
+        self.gpu_prog = QProgressBar()
+        self.gpu_prog.setMaximum(1000)
+        c.add(self.gpu_prog)
+        body = QHBoxLayout()
+        body.setSpacing(16)
+        self.gpu_view = QLabel()
+        self.gpu_view.setMinimumSize(384, 216)
+        self.gpu_view.setAlignment(Qt.AlignCenter)
+        self.gpu_view.setObjectName("Transparent")
+        body.addWidget(self.gpu_view, 3)
+        col = QHBoxLayout()
+        self.g_score = StatTile("Nota", "—", "FPS × 10")
+        self.g_fps = StatTile("FPS", "—", "média · 1 % low")
+        col.addWidget(self.g_score)
+        col.addWidget(self.g_fps)
+        body.addLayout(col, 2)
+        c.add(body)
+        self.gpu_info = label("Referência: RX 6500 XT ≈ 1490 em 1080p.", "Muted", wrap=True)
+        c.add(self.gpu_info)
+        self.add(c)
+        self.gpu_proc: QProcess | None = None
+        self._gpu_buf = b""
+        self._gpu_result = None
+
+    def _gpu_toggle(self):
+        import tempfile
+        from ...core import gpubench
+        if self.gpu_proc is not None:
+            self.gpu_proc.kill()
+            return
+        self._gpu_img = os.path.join(tempfile.gettempdir(), f"nexo-gpubench-{os.getpid()}.png")
+        cmd = gpubench.child_command(self.gpu_res.currentData(), self._gpu_img)
+        self._gpu_buf, self._gpu_result, self._gpu_err = b"", None, ""
+        p = QProcess(self)
+        p.setProcessChannelMode(QProcess.SeparateChannels)
+        p.readyReadStandardOutput.connect(self._gpu_read)
+        p.finished.connect(self._gpu_finished)
+        self.gpu_proc = p
+        self.gpu_prog.setValue(0)
+        self.g_score.set("…", "a aquecer a placa")
+        self.g_fps.set("—", "média · 1 % low")
+        self.gpu_btn.setText("Cancelar")
+        self.gpu_res.setEnabled(False)
+        p.start(cmd[0], cmd[1:])
+
+    def _gpu_read(self):
+        import json
+        self._gpu_buf += bytes(self.gpu_proc.readAllStandardOutput())
+        *lines, self._gpu_buf = self._gpu_buf.split(b"\n")
+        for ln in lines:
+            try:
+                ev = json.loads(ln)
+            except ValueError:
+                continue
+            kind = ev.get("ev")
+            if kind == "info":
+                self.gpu_info.setText(f"{ev['renderer']} · OpenGL {ev['version']} · {ev['w']}×{ev['h']}")
+            elif kind == "warn":
+                notify(ev["msg"], "warn")
+                self.gpu_info.setText(self.gpu_info.text() + " — " + ev["msg"])
+            elif kind == "progress":
+                self.gpu_prog.setValue(int(ev["frac"] * 1000))
+                self.g_score.set(f"{ev['fps'] * 10:.0f}", "parcial")
+                self.g_fps.set(f"{ev['fps']:.0f}", "a medir…")
+            elif kind == "done":
+                self._gpu_result = ev
+            elif kind == "error":
+                self._gpu_err = ev.get("msg", "")
+
+    def _gpu_finished(self, *_a):
+        from PySide6.QtGui import QPixmap
+        self._gpu_read()
+        self.gpu_proc = None
+        self.gpu_btn.setText("Testar placa gráfica")
+        self.gpu_res.setEnabled(True)
+        r = self._gpu_result
+        if not r:
+            self.g_score.set("—", "FPS × 10")
+            self.g_fps.set("—", "média · 1 % low")
+            if self._gpu_err:
+                notify(f"Benchmark da placa gráfica falhou: {self._gpu_err}", "bad")
+                self.gpu_info.setText(self._gpu_err)
+            else:
+                notify("Benchmark da placa gráfica cancelado", "warn")
+            return
+        self.gpu_prog.setValue(1000)
+        self.g_score.set(str(r["score"]), f"pontos · {self.gpu_res.currentText()}", "ok")
+        self.g_fps.set(f"{r['fps']:.0f}", f"média · 1 % low {r['low1']:.0f}")
+        if r.get("image") and os.path.exists(r["image"]):
+            pm = QPixmap(r["image"])
+            self.gpu_view.setPixmap(pm.scaled(self.gpu_view.width(), self.gpu_view.height(), Qt.KeepAspectRatio,
+                                              Qt.SmoothTransformation))
+            try:
+                os.remove(r["image"])
+            except OSError:
+                pass
+        hist = load_json("bench_history.json", [])
+        hist.append({"date": time.strftime("%Y-%m-%d %H:%M"), "score": r["score"], "cpu": r["renderer"],
+                     "mode": "Placa gráfica", "quality": self.gpu_res.currentText()})
+        save_json("bench_history.json", hist[-30:])
+        self._load_history()
+        notify(f"Placa gráfica: {r['score']} pontos ({r['fps']:.0f} FPS)", "ok")
+
     def shutdown(self):
+        if self.gpu_proc is not None:
+            self.gpu_proc.kill()
         self.running = False
         if self.pool:
             self.pool.terminate()

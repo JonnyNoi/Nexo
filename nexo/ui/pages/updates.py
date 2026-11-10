@@ -9,7 +9,8 @@ from PySide6.QtWidgets import (QComboBox, QHeaderView, QLineEdit, QMessageBox, Q
 
 from ...core import updates as up
 from ...core.util import IS_WIN, get_setting, human_duration, set_setting
-from ..widgets import Card, Page, SettingRow, Toggle, hbox, label, notify, run_async, separator
+from .. import theme
+from ..widgets import Card, Page, SettingRow, Toggle, hbox, label, notify, run_async, separator, status_dot
 
 SRC_TIP = {"Sistema": "Pacotes da distribuição", "AUR": "Pacotes do AUR (paru/yay)",
            "Flatpak": "Aplicações Flatpak", "winget": "Programas geridos pelo winget"}
@@ -74,11 +75,54 @@ class UpdatesPage(Page):
         lst.add(self.notes)
         self.add(lst, 1)
 
+        drv = Card("Drivers da placa gráfica", "Versão instalada e se há uma mais recente (Linux: Mesa ou NVIDIA; "
+                   "Windows: driver do fabricante).", icon="gauge")
+        self.btn_drv = QPushButton("Verificar")
+        self.btn_drv.clicked.connect(self.check_drivers)
+        drv.head.addWidget(self.btn_drv)
+        self.drv_body = label("A verificar…", "", wrap=True)
+        self.drv_body.setTextFormat(Qt.RichText)
+        self.drv_body.setOpenExternalLinks(True)
+        drv.add(self.drv_body)
+        self.add(drv)
+        self._drv_checked = False
+
         self.items: list[up.Update] = []
         self._busy = False
 
     # ------------------------------------------------------------------
+    def check_drivers(self):
+        from ...core import drivers
+        from ..netmonitor import monitor
+        self.btn_drv.setEnabled(False)
+        self.drv_body.setText("A verificar os drivers…")
+        online = monitor().online is not False
+
+        def done(lst):
+            self.btn_drv.setEnabled(True)
+            if not lst:
+                self.drv_body.setText("Não encontrei nenhuma placa gráfica com driver identificável.")
+                return
+            rows = []
+            for d in lst:
+                kind = {"ok": "ok", "warn": "warn"}.get(d.status, "muted")
+                ver = f"{d.component} {d.version}" if d.component != "Driver" else f"versão {d.version}"
+                extra = f" · de {d.date}" if d.date else ""
+                latest = f" · mais recente: {d.latest}" if d.latest and d.latest != d.version else ""
+                link = f" <a href='{d.link}'>Página oficial</a>" if d.link and d.status == "warn" else ""
+                rows.append(f"{status_dot(kind)} <b>{d.gpu}</b><br>{ver}{extra}{latest}<br>"
+                            f"<span style='color:{theme.C['muted']}'>{d.message}</span>{link}")
+            self.drv_body.setText("<br><br>".join(rows))
+
+        def fail(m):
+            self.btn_drv.setEnabled(True)
+            self.drv_body.setText(f"Não foi possível verificar: {m}")
+        run_async(drivers.check, online, on_done=done, on_fail=fail)
+
     def on_show(self):
+        if not self._drv_checked:
+            self._drv_checked = True
+            self.check_drivers()
         data = up.cached()
         if data:
             self._show(data)
@@ -103,6 +147,7 @@ class UpdatesPage(Page):
             self.btn_check.setText("Verificar agora")
             if data:
                 self._show(data)
+                self.check_drivers()   # as atualizações pendentes também dizem se há driver novo
                 if force:
                     n = len(data.get("items", []))
                     notify(f"{n} atualizações disponíveis." if n else "Está tudo atualizado.", "info" if n else "ok")

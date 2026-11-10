@@ -7,6 +7,10 @@ import sys
 def main() -> int:
     multiprocessing.freeze_support()  # necessário no .exe do Windows (PyInstaller)
     from .core import log as nlog
+    if "--gpubench" in sys.argv:
+        nlog.setup("gpubench")  # benchmark da placa gráfica (processo à parte, ver core/gpubench.py)
+        from .core.gpubench import main_from_argv
+        return main_from_argv(sys.argv)
     if "--overlay" in sys.argv:
         nlog.setup("overlay")  # processo do overlay de jogo (lançado pela janela principal)
         from .ui.overlay import run

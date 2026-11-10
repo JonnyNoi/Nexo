@@ -129,6 +129,30 @@ class GameModePage(Page):
         det.add(hbox(None, b_rm))
         self.add(det)
 
+        # ---------------------------------------------------------------- sessões
+        ses = Card("Sessões de jogo", "Tempo jogado, FPS e temperaturas de cada sessão — guardado automaticamente "
+                   "quando o jogo fecha.", icon="chart")
+        self.ses_period = QComboBox()
+        for txt, days in (("Últimos 7 dias", 7), ("Últimos 30 dias", 30), ("Desde sempre", 0)):
+            self.ses_period.addItem(txt, days)
+        self.ses_period.setCurrentIndex(1)
+        self.ses_period.currentIndexChanged.connect(lambda _i: self._load_sessions())
+        b_clear = QPushButton("Apagar histórico")
+        b_clear.clicked.connect(self._clear_sessions)
+        ses.head.addWidget(self.ses_period)
+        ses.head.addWidget(b_clear)
+        self.ses_info = label("", "Muted", wrap=True)
+        ses.add(self.ses_info)
+        self.ses_sum = self._mk_table(["Jogo", "Sessões", "Tempo", "FPS médio", "CPU máx.", "GPU máx."], 180)
+        ses.add(self.ses_sum)
+        ses.add(label("Últimas sessões", "Section"))
+        self.ses_list = self._mk_table(["Jogo", "Quando", "Duração", "FPS médio", "1 % low", "Mín.", "CPU máx.",
+                                        "GPU máx."], 220)
+        self.ses_list.setToolTip("«1 % low»: o FPS abaixo do qual o jogo esteve 1 % do tempo — mostra as quebras "
+                                 "(engasgos) melhor do que a média. Calculado com uma amostra por segundo.")
+        ses.add(self.ses_list)
+        self.add(ses)
+
         # ---------------------------------------------------------------- biblioteca
         lib = Card("Jogos instalados", icon="package")
         self.lib_search = QLineEdit()
@@ -166,12 +190,87 @@ class GameModePage(Page):
         self.timer.timeout.connect(self._refresh_now)
         self._load_extra()
 
+    # ------------------------------------------------------------------ sessões
+    @staticmethod
+    def _mk_table(headers, min_h):
+        t = QTableWidget(0, len(headers))
+        t.setHorizontalHeaderLabels(headers)
+        hh = t.horizontalHeader()
+        hh.setSectionResizeMode(0, QHeaderView.Stretch)
+        for c in range(1, len(headers)):
+            hh.setSectionResizeMode(c, QHeaderView.ResizeToContents)
+        t.verticalHeader().setVisible(False)
+        t.setEditTriggers(QTableWidget.NoEditTriggers)
+        t.setSelectionMode(QTableWidget.NoSelection)
+        t.setFocusPolicy(Qt.NoFocus)
+        t.setAlternatingRowColors(True)
+        t.setShowGrid(False)
+        t.setMinimumHeight(min_h)
+        return t
+
+    def _load_sessions(self):
+        days = self.ses_period.currentData() or None
+
+        def work():
+            from ...core import sessions
+            since = time.time() - days * 86400 if days else 0
+            return sessions.summary(days), [x for x in sessions.recent(200) if x.start >= since]
+        run_async(work, on_done=self._got_sessions, on_fail=lambda _m: None)
+
+    @staticmethod
+    def _dur(minutes: float) -> str:
+        h, m = divmod(int(round(minutes)), 60)
+        return f"{h} h {m:02d} min" if h else f"{m} min"
+
+    def _got_sessions(self, res):
+        summ, recent = res
+        total = sum(g.minutes for g in summ)
+        self.ses_info.setText(
+            f"{len(summ)} jogos · {sum(g.sessions for g in summ)} sessões · {self._dur(total)} a jogar"
+            if summ else "Ainda não há sessões neste período. Jogue um pouco — cada sessão com mais de 1 minuto "
+            "fica registada aqui (o FPS precisa do contador de FPS ativo).")
+
+        def cell(t, r, c, txt, right=True):
+            it = QTableWidgetItem(txt)
+            if right:
+                it.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            t.setItem(r, c, it)
+        fmt = lambda v, u="": "—" if v is None else f"{v:.0f}{u}"  # noqa: E731
+        self.ses_sum.setRowCount(len(summ))
+        for i, g in enumerate(summ):
+            cell(self.ses_sum, i, 0, g.game, False)
+            cell(self.ses_sum, i, 1, str(g.sessions))
+            cell(self.ses_sum, i, 2, self._dur(g.minutes))
+            cell(self.ses_sum, i, 3, fmt(g.fps_avg))
+            cell(self.ses_sum, i, 4, fmt(g.cpu_max, " °C"))
+            cell(self.ses_sum, i, 5, fmt(g.gpu_max, " °C"))
+        self.ses_list.setRowCount(len(recent))
+        for i, x in enumerate(recent):
+            cell(self.ses_list, i, 0, x.game, False)
+            cell(self.ses_list, i, 1, time.strftime("%d/%m %H:%M", time.localtime(x.start)))
+            cell(self.ses_list, i, 2, self._dur(x.minutes))
+            cell(self.ses_list, i, 3, fmt(x.fps_avg))
+            cell(self.ses_list, i, 4, fmt(x.fps_low1))
+            cell(self.ses_list, i, 5, fmt(x.fps_min))
+            cell(self.ses_list, i, 6, fmt(x.cpu_max, " °C"))
+            cell(self.ses_list, i, 7, fmt(x.gpu_max, " °C"))
+
+    def _clear_sessions(self):
+        from ..widgets import confirm
+        if not confirm(self, "Apagar histórico", "Apagar o histórico de todas as sessões de jogo?"):
+            return
+        from ...core import sessions
+        sessions.clear()
+        self._load_sessions()
+        notify("Histórico das sessões apagado.", "ok")
+
     # ------------------------------------------------------------------
     def _win(self):
         return self.window() if hasattr(self.window(), "overlay") else None
 
     def on_show(self):
         self._refresh_now()
+        self._load_sessions()
         self.timer.start(1000)
         if not self._lib_loaded:
             self._lib_loaded = True

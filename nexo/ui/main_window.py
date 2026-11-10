@@ -1017,7 +1017,7 @@ class MainWindow(QMainWindow):
         if fan_prof or existing_fan_manager() is not None:
             fan_manager(self.hub).set_game(g.name if g is not None else None)
         if g is not None:
-            self.game_stats = {"cpu_max": None, "gpu_max": None, "start": g.started}
+            self.game_stats = {"cpu_max": None, "gpu_max": None, "start": g.started, "fps": []}
             if get_setting("game_notify"):
                 extra = []
                 if get_setting("overlay_auto"):
@@ -1033,6 +1033,7 @@ class MainWindow(QMainWindow):
 
     def _game_ended(self, g):
         import time as _t
+        self._save_session(g)
         mins = max(1, int((_t.time() - (self.game_stats.get("start") or _t.time())) / 60))
         if get_setting("game_notify"):
             parts = [f"Sessão de {g.name}: {mins} min"]
@@ -1067,6 +1068,24 @@ class MainWindow(QMainWindow):
             st["fps_sum"] = st.get("fps_sum", 0.0) + f["fps"]
             st["fps_n"] = st.get("fps_n", 0) + 1
             st["fps_min"] = min(st.get("fps_min") or f["fps"], f["fps"])
+            st.setdefault("fps", []).append(f["fps"])
+
+    def _save_session(self, g, wait: bool = False):
+        """Guarda a sessão no histórico (Modo jogo → Sessões de jogo)."""
+        import time as _t
+        from ..core import sessions
+        st = self.game_stats or {}
+        if not st or st.get("saved"):
+            return
+        st["saved"] = True
+        avg, low1, mn = sessions.fps_stats(st.get("fps") or [])
+        sess = sessions.Session(g.name, st.get("start") or _t.time(), _t.time(), st.get("cpu_max"), st.get("gpu_max"),
+                                avg, low1, mn)
+        if wait:   # ao sair do Nexo com o jogo ainda aberto
+            sessions.add(sess)
+            return
+        from .widgets import run_async
+        run_async(sessions.add, sess, on_done=lambda _ok: self._notify_game_page(), on_fail=lambda _m: None)
 
     def set_overlay_manual(self, on: bool):
         self.overlay_manual = on
@@ -1102,6 +1121,8 @@ class MainWindow(QMainWindow):
                                       "Para sair: botão direito no ícone → Sair.", QSystemTrayIcon.Information, 6000)
             return
         set_setting("geometry", bytes(self.saveGeometry().toBase64()).decode())
+        if self.game is not None:
+            self._save_session(self.game, wait=True)
         self.overlay.hide()
         self.overlay.fps.stop()
         from .hwcontrol import existing_fan_manager
