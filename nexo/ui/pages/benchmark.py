@@ -101,6 +101,7 @@ class BenchmarkPage(Page):
         hist = Card("Histórico")
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["Data", "Modo", "Qualidade", "Nota", "Processador / placa"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -236,7 +237,7 @@ class BenchmarkPage(Page):
         col.addWidget(self.g_fps)
         body.addLayout(col, 2)
         c.add(body)
-        self.gpu_info = label("Referência: RX 6500 XT ≈ 1490 em 1080p.", "Muted", wrap=True)
+        self.gpu_info = label("Referência: RX 6500 XT ≈ 1500 em 1080p.", "Muted", wrap=True)
         c.add(self.gpu_info)
         self.add(c)
         self.gpu_proc: QProcess | None = None

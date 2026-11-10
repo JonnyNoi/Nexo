@@ -53,11 +53,16 @@ def targets() -> list[tuple[str, str, int]]:
     parts = [p for p in parts if "ro" not in p.opts.split(",") and "cdrom" not in p.opts
              and p.fstype.lower() not in ("squashfs", "iso9660", "udf", "tmpfs", "devtmpfs", "overlay", "")]
 
+    try:   # todas as montagens (incluindo tmpfs) para saber onde fica realmente cada pasta
+        every = psutil.disk_partitions(all=True)
+    except OSError:
+        every = parts
+
     def owner(path: str):
         """Partição (a montagem mais longa que contém o caminho)."""
         path = os.path.normcase(os.path.realpath(path))
         best = None
-        for p in parts:
+        for p in every:
             mp = os.path.normcase(p.mountpoint)
             if path == mp or path.startswith(mp.rstrip("\\/") + os.sep) or mp in ("/", "\\"):
                 if best is None or len(mp) > len(os.path.normcase(best.mountpoint)):
@@ -79,7 +84,8 @@ def targets() -> list[tuple[str, str, int]]:
         if tmp and dev == tmp_dev:
             cand.append(tmp)
         cand += mps
-        where = next((c for c in cand if os.path.isdir(c) and os.access(c, os.W_OK)), None)
+        where = next((c for c in cand if os.path.isdir(c) and os.access(c, os.W_OK)
+                      and getattr(owner(c), "device", None) == dev), None)
         if not where:
             continue
         try:   # restos de um teste interrompido (o Nexo fechou a meio)

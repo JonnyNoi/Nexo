@@ -251,6 +251,34 @@ class InternetPage(Page):
         if monitor().status is not None:
             self._show_net(monitor().status)
 
+        # ---------------------------------------------------------------- programas
+        from ...core.netprocs import NetProcMonitor
+        self.np_mon = NetProcMonitor()
+        pc = Card("Programas a usar a internet",
+                  ("Velocidade de cada programa agora (ligações TCP) e quanto transferiu desde que abriu esta página. "
+                   "Tráfego UDP (alguns jogos, chamadas, HTTP/3) aparece só como ligações.")
+                  if self.np_mon.has_rates else
+                  "Programas com ligações abertas para a internet e para quantos servidores. O Windows não diz "
+                  "quanto cada programa transfere sem ferramentas extra.", icon="wifi")
+        cols = ["Programa", "Ligações", "Servidores"] + (["Download", "Upload", "Total"] if self.np_mon.has_rates else [])
+        self.np_table = QTableWidget(0, len(cols))
+        self.np_table.setHorizontalHeaderLabels(cols)
+        self.np_table.verticalHeader().setVisible(False)
+        self.np_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.np_table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.np_table.setShowGrid(False)
+        self.np_table.setAlternatingRowColors(True)
+        hh = self.np_table.horizontalHeader()
+        hh.setSectionResizeMode(QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(0, QHeaderView.Stretch)
+        self.np_table.setMinimumHeight(220)
+        pc.add(self.np_table)
+        self.add(pc)
+        from PySide6.QtCore import QTimer
+        self.np_timer = QTimer(self)
+        self.np_timer.timeout.connect(self._np_tick)
+        self._np_busy = False
+
         # ---------------------------------------------------------------- histórico
         hc = Card("Histórico", "Os últimos 30 testes ficam guardados neste computador.", icon="list")
         self.table = QTableWidget(0, 6)
@@ -280,6 +308,56 @@ class InternetPage(Page):
                                                 if k in sp.SpeedResult.__dataclass_fields__}), animate=False)
         else:
             self._fill_quality(None)
+
+    # ================================================================== programas
+    def on_show(self):
+        self._np_tick()
+        self.np_timer.start(2000)
+
+    def on_hide(self):
+        self.np_timer.stop()
+
+    def _np_tick(self):
+        if self._np_busy:
+            return
+        from ..widgets import run_async
+        self._np_busy = True
+
+        def done(rows):
+            self._np_busy = False
+            self._np_fill(rows)
+
+        def fail(_m):
+            self._np_busy = False
+        run_async(self.np_mon.sample, on_done=done, on_fail=fail)
+
+    def _np_fill(self, rows):
+        from ...core.util import human_bytes
+        t = self.np_table
+        rows = rows[:40]
+        t.setRowCount(len(rows))
+
+        def cell(r, c, txt, tip=None):
+            it = t.item(r, c)
+            if it is None:
+                it = QTableWidgetItem()
+                if c:
+                    it.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                t.setItem(r, c, it)
+            if it.text() != txt:
+                it.setText(txt)
+            if tip is not None:
+                it.setToolTip(tip)
+        rate = lambda v: "—" if v is None else f"{human_bytes(v)}/s" if v >= 1 else "0"  # noqa: E731
+        for i, p in enumerate(rows):
+            cell(i, 0, p.name, f"PID {p.pid}")
+            cell(i, 1, str(p.conns))
+            cell(i, 2, str(len(p.remotes)), "\n".join(sorted(p.remotes)[:15]))
+            if self.np_mon.has_rates:
+                cell(i, 3, rate(p.down))
+                cell(i, 4, rate(p.up))
+                tot = p.total_down + p.total_up
+                cell(i, 5, human_bytes(tot) if tot else "—")
 
     # ================================================================== teste
     def _toggle(self):
