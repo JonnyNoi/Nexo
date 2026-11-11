@@ -15,6 +15,10 @@ def main() -> int:
         nlog.setup("overlay")  # processo do overlay de jogo (lançado pela janela principal)
         from .ui.overlay import run
         return run()
+    if "--wallpaper-player" in sys.argv:
+        nlog.setup("fundo-animado")  # leitor do fundo animado (processo à parte, ver ui/wpplayer.py)
+        from .ui.wpplayer import run as run_player
+        return run_player(sys.argv)
     from PySide6.QtNetwork import QLocalServer, QLocalSocket
     from PySide6.QtWidgets import QApplication
 

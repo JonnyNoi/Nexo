@@ -126,19 +126,208 @@ def backend() -> tuple[str | None, str]:
 
 _WG = ["--accept-source-agreements", "--disable-interactivity"]
 
+# --------------------------------------------------------------------------------------- deteção
+# Linux: nomes de pacote (Arch / Debian / Fedora…) e executáveis, quando não são o nome da app em minúsculas.
+# As variantes do AUR (-bin, -git) são reconhecidas automaticamente.
+LINUX_HINTS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+    "Google Chrome": (("google-chrome", "google-chrome-stable"), ("google-chrome-stable", "google-chrome")),
+    "Brave": (("brave", "brave-browser"), ("brave", "brave-browser")),
+    "Vivaldi": (("vivaldi", "vivaldi-stable"), ("vivaldi", "vivaldi-stable")),
+    "Telegram": (("telegram-desktop",), ("telegram-desktop", "Telegram")),
+    "Signal": (("signal-desktop",), ("signal-desktop",)),
+    "Steam": (("steam", "steam-native-runtime", "steam-installer", "steam-launcher"), ("steam",)),
+    "Heroic Games Launcher": (("heroic-games-launcher",), ("heroic",)),
+    "ProtonUp-Qt": (("protonup-qt",), ("protonup-qt",)),
+    "Prism Launcher": (("prismlauncher", "prismlauncher-qt5"), ("prismlauncher",)),
+    "Spotify": (("spotify", "spotify-launcher", "spotify-client"), ("spotify", "spotify-launcher")),
+    "OBS Studio": (("obs-studio", "obs-studio-tytan652", "obs-studio-browser"), ("obs",)),
+    "HandBrake": (("handbrake", "handbrake-gtk"), ("ghb",)),
+    "LibreOffice": (("libreoffice-fresh", "libreoffice-still", "libreoffice", "libreoffice-core"),
+                    ("libreoffice", "soffice")),
+    "ONLYOFFICE": (("onlyoffice", "onlyoffice-desktopeditors"), ("onlyoffice-desktopeditors",)),
+    "Visual Studio Code": (("code", "visual-studio-code"), ("code",)),
+    "Mission Center": (("mission-center",), ("missioncenter",)),
+}
+
+# Windows: expressão para o nome no "Adicionar/remover programas" (por omissão: o nome da app como palavra).
+# None = só o winget sabe (apps da Microsoft Store / componentes).
+WIN_NAMES: dict[str, str | None] = {
+    "Heroic Games Launcher": r"^Heroic\b",
+    "Node.js LTS": r"^Node\.js\b",
+    "Visual C++ Redistributable": r"Visual C\+\+ 2015-20\d\d Redistributable \(x64\)",
+    ".NET Desktop Runtime 8": r"Windows Desktop Runtime - 8\.",
+    "DirectX (runtime)": None,
+    "Windows Terminal": None,
+    "Steam": r"^Steam$",
+}
+
+LINUX_NATIVE = {"pacman": "pacman", "apt": "apt", "rpm": "dnf/rpm", "snap": "Snap"}
+
+
+@dataclass(frozen=True)
+class Found:
+    source: str          # "Flatpak", "winget", "pacman", "apt", "dnf/rpm", "Snap", "Windows", "AppImage/manual"
+    managed: bool        # True = o Nexo consegue desinstalar/atualizar pelo gestor da página
+
+    @property
+    def label(self) -> str:
+        return {"Windows": "programa do Windows", "AppImage/manual": "AppImage / manual"}.get(self.source, self.source)
+
+
+def _native_packages() -> tuple[str, set[str]]:
+    """(gestor, nomes dos pacotes instalados) — pacman, dpkg ou rpm."""
+    for tool, cmd in (("pacman", ["pacman", "-Qq"]),
+                      ("apt", ["dpkg-query", "-W", "-f=${Package}\n"]),
+                      ("rpm", ["rpm", "-qa", "--qf", "%{NAME}\n"])):
+        if which(cmd[0]):
+            code, out = run(cmd, timeout=60)
+            if code == 0:
+                return LINUX_NATIVE[tool], {ln.strip().lower() for ln in out.splitlines() if ln.strip()}
+    return "", set()
+
+
+def _snaps() -> set[str]:
+    if not which("snap"):
+        return set()
+    code, out = run(["snap", "list"], timeout=30)
+    return {ln.split()[0].lower() for ln in out.splitlines()[1:] if ln.strip()} if code == 0 else set()
+
+
+def _desktop_names() -> set[str]:
+    """Nomes das entradas do menu (.desktop) — apanha AppImages integradas e instalações manuais."""
+    from pathlib import Path
+    dirs = [Path.home() / ".local/share/applications", Path("/usr/share/applications"),
+            Path("/usr/local/share/applications"), Path("/var/lib/snapd/desktop/applications")]
+    names = set()
+    for d in dirs:
+        try:
+            files = list(d.glob("*.desktop"))
+        except OSError:
+            continue
+        for f in files:
+            try:
+                for ln in f.read_text(errors="replace").splitlines():
+                    if ln.startswith("Name="):
+                        names.add(ln[5:].strip().lower())
+                        break
+            except OSError:
+                pass
+    return names
+
+
+def _linux_candidates(a: App) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    base = a.name.lower().replace(" ", "-")
+    pkgs, bins = LINUX_HINTS.get(a.name, ((base,), (base,)))
+    return tuple(p.lower() for p in pkgs), bins
+
+
+def _linux_detect(apps: list[App]) -> dict[str, Found]:
+    import shutil
+    flat = set()
+    if which("flatpak"):
+        _c, out = run(["flatpak", "list", "--app", "--columns=application"], timeout=60)
+        flat = {ln.strip() for ln in out.splitlines() if ln.strip()}
+    mgr, native = _native_packages()
+    snaps = _snaps()
+    menu: set[str] | None = None
+    found: dict[str, Found] = {}
+    for a in apps:
+        if a.flatpak and a.flatpak in flat:
+            found[a.name] = Found("Flatpak", True)
+            continue
+        pkgs, bins = _linux_candidates(a)
+        if native and any(p in native or f"{p}-bin" in native or f"{p}-git" in native for p in pkgs):
+            found[a.name] = Found(mgr, False)
+        elif any(p in snaps for p in pkgs):
+            found[a.name] = Found("Snap", False)
+        elif any(shutil.which(b) for b in bins):
+            found[a.name] = Found("AppImage/manual", False)
+        else:
+            if menu is None:
+                menu = _desktop_names()
+            n = a.name.lower()
+            if any(m == n or m.startswith(n + " ") for m in menu):
+                found[a.name] = Found("AppImage/manual", False)
+    return found
+
+
+def _win_programs() -> list[str]:
+    """Nomes em "Adicionar/remover programas" (registo: máquina 64/32 bits e utilizador)."""
+    import winreg
+    names = []
+    keys = [(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall")]
+    for hive, path in keys:
+        try:
+            root = winreg.OpenKey(hive, path)
+        except OSError:
+            continue
+        with root:
+            i = 0
+            while True:
+                try:
+                    sub = winreg.EnumKey(root, i)
+                except OSError:
+                    break
+                i += 1
+                try:
+                    with winreg.OpenKey(root, sub) as k:
+                        name = str(winreg.QueryValueEx(k, "DisplayName")[0]).strip()
+                        try:
+                            if int(winreg.QueryValueEx(k, "SystemComponent")[0]) == 1 and "Redistributable" not in name:
+                                continue
+                        except (OSError, ValueError):
+                            pass
+                        if name:
+                            names.append(name)
+                except OSError:
+                    continue
+    return names
+
+
+def _win_detect(apps: list[App]) -> dict[str, Found]:
+    found: dict[str, Found] = {}
+    if which("winget"):   # IDs do winget (inclui apps da Microsoft Store)
+        _c, out = run(["winget", "list", *_WG], timeout=120)
+        low = out.lower()
+        for a in apps:
+            if a.winget and re.search(r"(?<![\w.])" + re.escape(a.winget.lower()) + r"(?![\w.])", low):
+                found[a.name] = Found("winget", True)
+    try:
+        progs = _win_programs()
+    except Exception:  # noqa: BLE001
+        progs = []
+    for a in apps:
+        if a.name in found:
+            continue
+        pat = WIN_NAMES.get(a.name, r"(?<![\w])" + re.escape(a.name) + r"(?![\w])")
+        if pat and any(re.search(pat, p, re.I) for p in progs):
+            found[a.name] = Found("Windows", bool(a.winget and which("winget")))
+    if "LibreHardwareMonitor" not in found:
+        try:
+            from . import lhm
+            if lhm.installed():
+                found["LibreHardwareMonitor"] = Found("Nexo", False)
+        except Exception:  # noqa: BLE001
+            pass
+    return found
+
+
+def detect_installed() -> dict[str, Found]:
+    """{nome da app: de onde vem}. Vê todas as formas de instalação, não só o gestor desta página."""
+    apps = available_apps()
+    if IS_WIN:
+        return _win_detect(apps)
+    if IS_LINUX:
+        return _linux_detect(apps)
+    return {}
+
 
 def installed_ids() -> set[str]:
-    """IDs instalados (só os do catálogo, para ser rápido e fiável)."""
-    b, _ = backend()
-    if b == "winget":
-        code, out = run(["winget", "list", *_WG], timeout=120)
-        low = out.lower()
-        return {a.winget for a in available_apps() if re.search(r"(?<![\w.])" + re.escape(a.winget.lower()) + r"(?![\w.])", low)}
-    if b == "flatpak":
-        code, out = run(["flatpak", "list", "--app", "--columns=application"], timeout=60)
-        have = {ln.strip() for ln in out.splitlines() if ln.strip()}
-        return {a.flatpak for a in available_apps() if a.flatpak in have}
-    return set()
+    """IDs (winget/Flatpak) das apps do catálogo instaladas, seja de que forma for."""
+    found = detect_installed()
+    return {a.pkg_id for a in available_apps() if a.name in found}
 
 
 def _ensure_flathub() -> None:

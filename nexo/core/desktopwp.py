@@ -225,33 +225,57 @@ IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp", ".bmp")
 
 
 def images() -> list[str]:
-    """Imagens guardadas na pasta de fundos do Nexo (vídeos/GIF não servem de fundo do sistema)."""
+    """Imagens paradas guardadas na pasta de fundos do Nexo (usadas na troca automática)."""
+    from . import animwp
+    return [f for f in media() if f.lower().endswith(IMAGE_EXT) and not animwp.is_animated(f)]
+
+
+def media() -> list[str]:
+    """Todos os fundos guardados: imagens, GIF/WEBP animados e vídeos."""
     from .wallhaven import list_local
-    return [f for f in list_local() if f.lower().endswith(IMAGE_EXT)]
+    return list_local()
 
 
-def set_wallpaper(path: str, style: str | None = None, lock_screen: bool = False) -> tuple[bool, str]:
+def set_wallpaper(path: str, style: str | None = None, lock_screen: bool = False,
+                  still: str | None = None) -> tuple[bool, str]:
+    """Põe o fundo. Vídeos e GIF/WEBP animados ficam animados (ver core/animwp.py); `still` é a 1.ª imagem
+    já extraída (opcional — serve para o ecrã de bloqueio e como reserva)."""
+    from . import animwp
     if not os.path.isfile(path):
         return False, "Ficheiro não encontrado"
-    if not path.lower().endswith(IMAGE_EXT):
-        return False, "Use uma imagem (PNG, JPG, WEBP ou BMP)"
+    animated = animwp.is_animated(path)
+    if not animated and not path.lower().endswith(IMAGE_EXT):
+        return False, "Use uma imagem (PNG, JPG, WEBP, BMP), um GIF animado ou um vídeo (MP4, WEBM, MKV…)"
     path = os.path.abspath(_stable_copy(path))
     style = style or get_setting("desktop_wp_style", "fill")
-    ok, msg = _win_set(path, style) if IS_WIN else _linux_set(path, style)
+    if animated:
+        still = still or animwp.still_frame(path)
+        ok, msg = animwp.set_animated(path, style, still)
+        lock_img = still
+    else:
+        animwp.stop()
+        ok, msg = _win_set(path, style) if IS_WIN else _linux_set(path, style)
+        lock_img = path
     if ok:
         set_setting("desktop_wp", path)
-        if lock_screen:
-            lok, lmsg = _win_lock(path) if IS_WIN else (_kde_lock(path) if desktop() == "kde" else
-                                                         _gsettings("org.gnome.desktop.screensaver", "picture-uri",
-                                                                    Path(path).as_uri()))
+        if lock_screen and lock_img:
+            lok, lmsg = _win_lock(lock_img) if IS_WIN else (
+                _kde_lock(lock_img) if desktop() == "kde" else
+                _gsettings("org.gnome.desktop.screensaver", "picture-uri", Path(lock_img).as_uri()))
             if not lok:
                 msg = f"Ecrã de bloqueio não alterado: {lmsg}"
     return ok, msg or ("Fundo alterado" if ok else "Não foi possível mudar o fundo")
 
 
 def current_wallpaper() -> str:
+    from . import animwp
+    anim = animwp.active()
+    if anim:
+        return anim
     try:
         p = _win_get() if IS_WIN else _linux_get()
     except Exception:  # noqa: BLE001
         p = ""
+    if IS_WIN and p and os.path.dirname(os.path.abspath(p)) == str(animwp.frames_dir()):
+        p = ""   # imagem de reserva de um fundo animado que já não está a tocar
     return p if p and os.path.exists(p) else (get_setting("desktop_wp") or "")

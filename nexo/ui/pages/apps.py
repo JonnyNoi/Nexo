@@ -34,8 +34,17 @@ class AppTile(QWidget):
         g.addWidget(d, 1, 0, 1, 3)
         self.setToolTip(app.pkg_id)
 
-    def set_installed(self, on: bool):
-        self.badge.setVisible(on)
+    def set_installed(self, found: "ap.Found | None"):
+        self.found = found
+        self.badge.setVisible(found is not None)
+        if found is None:
+            self.setToolTip(self.app.pkg_id)
+            return
+        self.badge.setText("instalada" if found.managed and found.source in ("Flatpak", "winget")
+                           else f"instalada · {found.label}")
+        self.setToolTip(f"{self.app.pkg_id}\nInstalada através de: {found.label}" +
+                        ("" if found.managed else "\nO Nexo não a desinstala nem atualiza "
+                                                  "(use o gestor por onde a instalou)."))
 
 
 class AppsPage(Page):
@@ -46,7 +55,7 @@ class AppsPage(Page):
         super().__init__("Instalar aplicações", sub)
         self.backend, msg = ap.backend()
         self.tiles: list[AppTile] = []
-        self.installed: set[str] = set()
+        self.installed: dict[str, ap.Found] = {}
         self.busy = False
 
         self.search = QLineEdit()
@@ -133,13 +142,17 @@ class AppsPage(Page):
         if not self.backend or self.busy:
             return
         self._log("A verificar o que já está instalado…")
-        run_async(ap.installed_ids, on_done=self._got_installed)
+        run_async(ap.detect_installed, on_done=self._got_installed)
 
-    def _got_installed(self, ids):
-        self.installed = ids
+    def _got_installed(self, found):
+        self.installed = found
         for t in self.tiles:
-            t.set_installed(t.app.pkg_id in ids)
-        self._log(f"{len(ids)} aplicações do catálogo já estão instaladas.")
+            t.set_installed(found.get(t.app.name))
+        by_src: dict[str, int] = {}
+        for f in found.values():
+            by_src[f.label] = by_src.get(f.label, 0) + 1
+        det = ", ".join(f"{n} {src}" for src, n in sorted(by_src.items(), key=lambda x: -x[1]))
+        self._log(f"{len(found)} aplicações do catálogo já estão instaladas" + (f" ({det})." if det else "."))
 
     def _filter(self):
         q = self.search.text().strip().lower()
@@ -179,8 +192,24 @@ class AppsPage(Page):
             return
         if kind == "install" and not require_online("Instalar aplicações"):
             return
+        if kind == "install":   # já instaladas por outro lado (ex.: pacman): não duplica com o Flatpak/winget
+            dup = [a for a in sel if a.name in self.installed]
+            if dup and not confirm(self, "Já instaladas", "Estas aplicações já estão instaladas:\n\n" +
+                                   "\n".join(f"{a.name} ({self.installed[a.name].label})" for a in dup) +
+                                   "\n\nInstalar outra cópia na mesma?"):
+                sel = [a for a in sel if a not in dup]
+                if not sel:
+                    return
         if kind == "uninstall":
-            sel = [a for a in sel if a.pkg_id in self.installed] or sel
+            other = [a for a in sel if a.name in self.installed and not self.installed[a.name].managed]
+            for a in other:
+                self._log(f"ℹ {a.name}: instalada através de {self.installed[a.name].label} — "
+                          "desinstale-a por esse gestor.")
+            sel = [a for a in sel if a.name in self.installed and self.installed[a.name].managed]
+            if not sel:
+                notify("Nenhuma das selecionadas foi instalada por esta página (veja o registo).", "warn")
+                self.ensureWidgetVisible(self.act_card)
+                return
             if not confirm(self, "Desinstalar", "Desinstalar estas aplicações?\n\n" + "\n".join(a.name for a in sel)):
                 return
         fn = ap.install if kind == "install" else ap.uninstall

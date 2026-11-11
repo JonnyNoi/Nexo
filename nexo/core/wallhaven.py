@@ -84,7 +84,7 @@ def source_of(path: str) -> str | None:
     return None
 
 
-MEDIA_EXT = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".mp4", ".webm", ".mkv", ".mov", ".m4v")
+MEDIA_EXT = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".apng", ".mp4", ".webm", ".mkv", ".mov", ".m4v", ".avi")
 
 
 def list_local() -> list[str]:
