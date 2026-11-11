@@ -9,12 +9,14 @@ from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QCoreApplication, QObject, Signal  # noqa: E402
+from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from nexo.core import fans as fc  # noqa: E402
 from nexo.core import util  # noqa: E402
 from nexo.ui import hwcontrol  # noqa: E402
 
-_app = QCoreApplication.instance() or QCoreApplication([])
+# QApplication (e não QCoreApplication) para o teste da interface poder correr no mesmo processo
+_app = QCoreApplication.instance() or QApplication([])
 
 
 class FakeHub(QObject):

@@ -1,12 +1,15 @@
-"""Libertar memória e fechar programas em segundo plano."""
+"""Programas em segundo plano: os que mais gastam RAM e quais é seguro fechar.
+
+(A antiga "Libertar memória" foi retirada: largar a cache de páginas no Linux ou esvaziar os
+working sets no Windows só faz parecer que há RAM livre; o sistema volta a ler tudo do disco
+e fica mais lento logo a seguir.)"""
 from __future__ import annotations
 
 import os
-import time
 
 import psutil
 
-from .util import IS_LINUX, IS_WIN, human_bytes, is_admin, run_root
+from .util import IS_WIN
 
 # Programas que é seguro fechar para libertar recursos (pré-marcados)
 SAFE_TO_CLOSE_WIN = {
@@ -29,82 +32,6 @@ _PROTECTED = {
     "dwm.exe", "smss.exe", "system", "registry", "memcompression", "fontdrvhost.exe", "sihost.exe",
     "ctfmon.exe", "audiodg.exe", "msmpeng.exe", "securityhealthservice.exe", "taskhostw.exe",
 }
-
-
-def clean_memory() -> tuple[bool, str]:
-    before = psutil.virtual_memory().available
-    if IS_WIN:
-        msgs = []
-        n = _win_empty_working_sets()
-        msgs.append(f"Memória de {n} processos compactada")
-        if is_admin():
-            ok = _win_purge_standby()
-            msgs.append("lista em espera limpa" if ok else "não foi possível limpar a lista em espera")
-        else:
-            msgs.append("lista em espera: precisa de administrador")
-        time.sleep(0.5)
-        freed = psutil.virtual_memory().available - before
-        return True, f"{'; '.join(msgs)}. Libertado: {human_bytes(max(0, freed))}"
-    if IS_LINUX:
-        code, out = run_root("sync && echo 3 > /proc/sys/vm/drop_caches && "
-                              "{ [ -w /proc/sys/vm/compact_memory ] && echo 1 > /proc/sys/vm/compact_memory; true; }")
-        if code != 0:
-            return False, out or "Cancelado"
-        time.sleep(0.5)
-        freed = psutil.virtual_memory().available - before
-        return True, f"Cache de páginas e inodes libertada. Disponível agora: " \
-                     f"{human_bytes(psutil.virtual_memory().available)} (+{human_bytes(max(0, freed))})"
-    return False, "Sistema não suportado"
-
-
-def _win_empty_working_sets() -> int:
-    import ctypes
-    from ctypes import wintypes
-    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    psapi = ctypes.WinDLL("psapi", use_last_error=True)
-    k32.OpenProcess.restype = wintypes.HANDLE
-    PROCESS_SET_QUOTA, PROCESS_QUERY_INFORMATION = 0x0100, 0x0400
-    n = 0
-    for p in psutil.process_iter(["pid"]):
-        h = k32.OpenProcess(PROCESS_SET_QUOTA | PROCESS_QUERY_INFORMATION, False, p.info["pid"])
-        if h:
-            if psapi.EmptyWorkingSet(h):
-                n += 1
-            k32.CloseHandle(h)
-    return n
-
-
-def _win_purge_standby() -> bool:
-    """Limpa a lista de memória em espera (como o ISLC). Requer administrador."""
-    import ctypes
-    from ctypes import wintypes
-
-    class LUID(ctypes.Structure):
-        _fields_ = [("LowPart", wintypes.DWORD), ("HighPart", wintypes.LONG)]
-
-    class LUID_AND_ATTRIBUTES(ctypes.Structure):
-        _fields_ = [("Luid", LUID), ("Attributes", wintypes.DWORD)]
-
-    class TOKEN_PRIVILEGES(ctypes.Structure):
-        _fields_ = [("PrivilegeCount", wintypes.DWORD), ("Privileges", LUID_AND_ATTRIBUTES * 1)]
-
-    adv = ctypes.WinDLL("advapi32", use_last_error=True)
-    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    ntdll = ctypes.WinDLL("ntdll")
-    k32.GetCurrentProcess.restype = wintypes.HANDLE
-    token = wintypes.HANDLE()
-    if not adv.OpenProcessToken(k32.GetCurrentProcess(), 0x0020 | 0x0008, ctypes.byref(token)):
-        return False
-    luid = LUID()
-    if not adv.LookupPrivilegeValueW(None, "SeProfileSingleProcessPrivilege", ctypes.byref(luid)):
-        return False
-    tp = TOKEN_PRIVILEGES(1, (LUID_AND_ATTRIBUTES * 1)(LUID_AND_ATTRIBUTES(luid, 0x2)))
-    adv.AdjustTokenPrivileges(token, False, ctypes.byref(tp), 0, None, None)
-    k32.CloseHandle(token)
-    SystemMemoryListInformation, MemoryPurgeStandbyList = 80, 4
-    cmd = ctypes.c_int(MemoryPurgeStandbyList)
-    status = ntdll.NtSetSystemInformation(SystemMemoryListInformation, ctypes.byref(cmd), ctypes.sizeof(cmd))
-    return status == 0
 
 
 def background_processes(limit: int = 40) -> list[dict]:

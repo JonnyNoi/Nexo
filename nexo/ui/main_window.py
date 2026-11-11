@@ -103,23 +103,28 @@ def _page_factories(hub, on_settings):
         from .pages.settings import SettingsPage
         return SettingsPage(on_settings)
 
-    tools_items = [("Internet", "wifi", internet), ("Atualizações", "upgrade", updates),
-                   ("Instalar aplicações", "download", apps),
-                   ("Utilitários", "wrench", tools),
-                   ("Arranque", "power", startup)]
+    # Uma entrada do menu pode juntar várias páginas: (nome no menu, ícone, [(página, ícone, fábrica), …]).
+    # As páginas de um grupo aparecem como separadores no topo do conteúdo.
+    opt = [("Otimização", "zap", optimize), ("Arranque", "power", startup)]
     if IS_WIN:
-        tools_items.append(("Windows debloat", "broom", debloat))
-    tools_items += [("Espaço em disco", "disk", disk), ("Fundo de ecrã", "image", wallpaper)]
+        opt.append(("Windows debloat", "broom", debloat))
     return [
         (None, [("Visão geral", "home", dashboard)]),
         ("SISTEMA", [("Informação", "info", system), ("Sensores", "thermo", sensors),
-                     ("Saúde dos discos", "hdd", diskhealth), ("Processos", "list", processes),
+                     ("Discos", "hdd", [("Saúde dos discos", "hdd", diskhealth),
+                                        ("Espaço em disco", "disk", disk)]),
+                     ("Processos", "list", processes),
                      ("Antivírus", "virus", antivirus)]),
-        ("DESEMPENHO", [("Otimização", "zap", optimize), ("Stress test", "flame", stress),
-                        ("Benchmark", "gauge", benchmark),
+        ("DESEMPENHO", [("Otimização", "zap", opt),
                         ("Modo jogo", "gamepad", gamemode),
-                        ("Ventoinhas", "fan", fans)]),
-        ("FERRAMENTAS", tools_items),
+                        ("Ventoinhas", "fan", fans),
+                        ("Testes", "gauge", [("Benchmark", "gauge", benchmark),
+                                             ("Stress test", "flame", stress)])]),
+        ("FERRAMENTAS", [("Software", "upgrade", [("Atualizações", "upgrade", updates),
+                                                  ("Instalar aplicações", "download", apps)]),
+                         ("Internet", "wifi", internet),
+                         ("Utilitários", "wrench", tools),
+                         ("Fundo de ecrã", "image", wallpaper)]),
         (None, [("Definições", "gear", settings)]),
     ]
 
@@ -435,11 +440,19 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.nav = QButtonGroup(self)
         self.nav.setExclusive(True)
+        # listas por PÁGINA (índice do QStackedWidget)
         self.pages: list = []          # None até a página ser criada
         self.factories: list = []
         self.names: list[str] = []
         self.icons: list[str] = []
+        self.btn_of: list[NavButton] = []        # botão do menu de cada página
+        self.group_of: list[list[int]] = []      # páginas que partilham o mesmo botão
+        self.badges: dict[int, tuple[str, str]] = {}
+        # listas por BOTÃO do menu
         self.nav_buttons: list[NavButton] = []
+        self.nav_icons: list[str] = []
+        self.groups: list[list[int]] = []
+        self._last_in_group: dict[int, int] = {}  # 1.ª página do grupo → última aberta
         self.sections: list[tuple[NavSection, list[NavButton]]] = []
         self.section_of: dict[int, NavSection] = {}
         collapsed = set(get_setting("nav_collapsed", []) or [])
@@ -455,20 +468,31 @@ class MainWindow(QMainWindow):
             elif self.pages:
                 nv.addStretch(1)  # "Definições" fica no fundo
                 nv.addSpacing(10)
-            for name, ic, factory in items:
-                b = NavButton(name)
-                idx = self.stack.addWidget(QWidget())  # marcador até a página ser criada
-                self.pages.append(None)
-                self.factories.append(factory)
-                self.names.append(name)
-                self.icons.append(ic)
+            for nav_name, nav_ic, what in items:
+                members = what if isinstance(what, list) else [(nav_name, nav_ic, what)]
+                b = NavButton(nav_name)
+                group: list[int] = []
+                for name, ic, factory in members:
+                    idx = self.stack.addWidget(QWidget())  # marcador até a página ser criada
+                    self.pages.append(None)
+                    self.factories.append(factory)
+                    self.names.append(name)
+                    self.icons.append(ic)
+                    self.btn_of.append(b)
+                    self.group_of.append(group)
+                    group.append(idx)
+                    if sec is not None:
+                        self.section_of[idx] = sec
+                if len(group) > 1:
+                    b.setToolTip(" · ".join(self.names[i] for i in group))
                 self.nav_buttons.append(b)
-                b.clicked.connect(lambda _c, i=idx: self.go(i))
-                self.nav.addButton(b, idx)
+                self.nav_icons.append(nav_ic)
+                self.groups.append(group)
+                b.clicked.connect(lambda _c, g=group: self.go(self._group_target(g)))
+                self.nav.addButton(b, len(self.nav_buttons) - 1)
                 nv.addWidget(b)
                 if sec is not None:
                     self.sections[-1][1].append(b)
-                    self.section_of[idx] = sec
         self._paint_nav_icons()
 
         sv.addSpacing(10)
@@ -507,6 +531,15 @@ class MainWindow(QMainWindow):
         rv = QVBoxLayout(self.right)
         rv.setContentsMargins(0, 0, 0, 0)
         rv.setSpacing(0)
+        self.subtabs = QFrame()
+        self.subtabs.setObjectName("SubTabs")
+        st = QHBoxLayout(self.subtabs)
+        st.setContentsMargins(28, 12, 28, 12)
+        st.setSpacing(8)
+        self.subtabs_layout = st
+        self.subtab_btns: dict[int, QPushButton] = {}
+        self.subtabs.hide()
+        rv.addWidget(self.subtabs)
         rv.addWidget(self.stack, 1)
         h.addWidget(self.right, 1)
         self.setCentralWidget(root)
@@ -591,10 +624,12 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------ menu lateral
     def _paint_nav_icons(self):
         c = theme.C
-        for b, ic in zip(self.nav_buttons, self.icons):
+        for b, ic in zip(self.nav_buttons, self.nav_icons):
             b.setIcon(make_icon(ic, c["muted"], c["accent"]))
         if hasattr(self, "btn_compact"):
             self.btn_compact.setIcon(make_icon("sidebar", c["text"]))
+        for i, b in getattr(self, "subtab_btns", {}).items():
+            b.setIcon(make_icon(self.icons[i], c["muted"], c["accent_text"]))
 
     def _apply_sections(self):
         for sec, buttons in self.sections:
@@ -642,16 +677,65 @@ class MainWindow(QMainWindow):
         for i, b in enumerate(self.nav_buttons):
             b.set_compact(on)
             key = f"Ctrl+{i + 1}" if i < 9 else ""
-            b.setToolTip(f"{b.name} · {key}" if on and key else b.name if on else key)
+            parts = " · ".join(self.names[j] for j in self.groups[i]) if len(self.groups[i]) > 1 else ""
+            tip = [x for x in ((b.name if on else ""), parts if parts != b.name else "", key) if x]
+            b.setToolTip(" — ".join(dict.fromkeys(tip)))
         for sec, _b in self.sections:
             sec.set_compact(on)
         self._theme_btn_text()
         self._apply_sections()
 
     def set_nav_badge(self, name: str, text: str | None, kind: str = "accent"):
-        """Contador/aviso ao lado de uma página do menu (None tira-o; "" mostra só um ponto)."""
-        if name in self.names:
-            self.nav_buttons[self.names.index(name)].set_badge(text, kind)
+        """Contador/aviso ao lado de uma página do menu (None tira-o; "" mostra só um ponto).
+        Numa página de um grupo, o aviso aparece no botão do grupo e no separador da página."""
+        if name not in self.names:
+            return
+        idx = self.names.index(name)
+        if text is None:
+            self.badges.pop(idx, None)
+        else:
+            self.badges[idx] = (text, kind)
+        shown = next((self.badges[i] for i in self.group_of[idx] if i in self.badges), None)
+        self.btn_of[idx].set_badge(*(shown or (None, "accent")))
+        if idx in self.subtab_btns:
+            self._subtab_text(idx)
+
+    # ------------------------------------------------------------------ separadores dos grupos
+    def _group_target(self, group: list[int]) -> int:
+        """Ao clicar num grupo, volta à última página aberta dele."""
+        return self._last_in_group.get(group[0], group[0])
+
+    def _subtab_text(self, idx: int):
+        b = self.subtab_btns[idx]
+        badge = self.badges.get(idx)
+        b.setText(self.names[idx] + (f"  ·  {badge[0]}" if badge and badge[0] else "  •" if badge else ""))
+
+    def _show_subtabs(self, idx: int):
+        group = self.group_of[idx]
+        if len(group) < 2:
+            self.subtabs.hide()
+            return
+        if set(self.subtab_btns) != set(group):
+            while self.subtabs_layout.count():
+                it = self.subtabs_layout.takeAt(0)
+                if it.widget() is not None:
+                    it.widget().hide()            # sai já do ecrã (o deleteLater só corre depois)
+                    it.widget().deleteLater()
+            self.subtab_btns = {}
+            for i in group:
+                b = QPushButton()
+                b.setObjectName("Chip")
+                b.setCheckable(True)
+                b.setCursor(Qt.PointingHandCursor)
+                b.setIcon(make_icon(self.icons[i], theme.C["muted"], theme.C["accent_text"]))
+                b.clicked.connect(lambda _c=False, i=i: self.go(i))
+                self.subtabs_layout.addWidget(b)
+                self.subtab_btns[i] = b
+                self._subtab_text(i)
+            self.subtabs_layout.addStretch(1)
+        for i, b in self.subtab_btns.items():
+            b.setChecked(i == idx)
+        self.subtabs.show()
 
     # ------------------------------------------------------------------ navegação
 
@@ -684,7 +768,9 @@ class MainWindow(QMainWindow):
         if sec is not None and sec.collapsed:
             self._toggle_section(sec, False)
         self.stack.setCurrentIndex(idx)
-        self.nav.button(idx).setChecked(True)
+        self.btn_of[idx].setChecked(True)
+        self._last_in_group[self.group_of[idx][0]] = idx
+        self._show_subtabs(idx)
         page.on_show()
         if get_setting("page_fade") and self.isVisible():
             self._fade_in(page)
@@ -707,8 +793,8 @@ class MainWindow(QMainWindow):
             self.go(self.names.index(name))
 
     def _setup_shortcuts(self):
-        for i in range(min(9, len(self.pages))):
-            QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self, activated=lambda i=i: self.go(i))
+        for i, g in enumerate(self.groups[:9]):
+            QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self, activated=lambda g=g: self.go(self._group_target(g)))
         QShortcut(QKeySequence("Ctrl+Tab"), self, activated=lambda: self.go((self.current + 1) % len(self.pages)))
         QShortcut(QKeySequence("Ctrl+Shift+Tab"), self,
                   activated=lambda: self.go((self.current - 1) % len(self.pages)))

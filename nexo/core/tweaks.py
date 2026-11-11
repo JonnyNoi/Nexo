@@ -499,12 +499,6 @@ def windows_extra_tweaks() -> list[Tweak]:
                  "As apps da Store deixam de correr escondidas (menos RAM e bateria).",
                  [("HKCU", r"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications",
                    "GlobalUserDisabled", "dword", 1)], S),
-        RegTweak("w_fso", "Desativar otimizações de ecrã inteiro",
-                 "Ecrã inteiro exclusivo a sério em jogos antigos (pode reduzir latência).",
-                 [("HKCU", r"System\GameConfigStore", "GameDVR_FSEBehaviorMode", "dword", 2),
-                  ("HKCU", r"System\GameConfigStore", "GameDVR_HonorUserFSEBehaviorMode", "dword", 1),
-                  ("HKCU", r"System\GameConfigStore", "GameDVR_FSEBehavior", "dword", 2),
-                  ("HKCU", r"System\GameConfigStore", "GameDVR_DXGIHonorFSEWindowsCompatible", "dword", 1)], S),
         RegTweak("w_bsod", "Ecrã azul detalhado", "Mostra o código de erro e o driver culpado num crash.",
                  [("HKLM", r"SYSTEM\CurrentControlSet\Control\CrashControl", "DisplayParameters", "dword", 1)], S),
         RegTweak("w_verbose", "Mensagens detalhadas ao arrancar/desligar",
@@ -548,6 +542,26 @@ def linux_extra_tweaks() -> list[Tweak]:
                     "fs.inotify.max_user_watches", 524288),
     ]
     return [t for t in tw if t.available()]
+
+
+def retired_tweaks() -> list[Tweak]:
+    """Ajustes que o Nexo deixou de oferecer, mas que ainda podem estar ligados neste PC.
+
+    Só aparecem se o Nexo os aplicou (há valor original guardado), para o utilizador os poder desligar."""
+    if not IS_WIN:
+        return []
+    applied = {k.split(":", 1)[0] for k in load_json(BACKUP_FILE, {})}
+    out = [
+        RegTweak("w_fso", "Desativar otimizações de ecrã inteiro",
+                 "No Windows 10/11 as otimizações de ecrã inteiro já dão a mesma latência, e desligá-las "
+                 "estraga o Auto HDR e a troca rápida de janelas. Desligue para repor o valor original.",
+                 [("HKCU", r"System\GameConfigStore", "GameDVR_FSEBehaviorMode", "dword", 2),
+                  ("HKCU", r"System\GameConfigStore", "GameDVR_HonorUserFSEBehaviorMode", "dword", 1),
+                  ("HKCU", r"System\GameConfigStore", "GameDVR_FSEBehavior", "dword", 2),
+                  ("HKCU", r"System\GameConfigStore", "GameDVR_DXGIHonorFSEWindowsCompatible", "dword", 1)],
+                 "Sistema"),
+    ]
+    return [t for t in out if t.id in applied]
 
 
 def restore_all(tweaks: list[Tweak]) -> list[str]:

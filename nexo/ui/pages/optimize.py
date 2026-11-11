@@ -82,20 +82,7 @@ class TweakList(Card):
 
 class OptimizePage(Page):
     def __init__(self):
-        super().__init__("Otimização", "Libertar memória, ajustes de desempenho reversíveis e programas em segundo plano")
-
-        mem = Card("Libertar memória",
-                   "Windows: compacta a memória dos processos e limpa a lista em espera (como o ISLC). "
-                   "Linux: liberta a cache de páginas e compacta a memória (pede palavra-passe).")
-        row = QHBoxLayout()
-        self.mem_lbl = label("", "Muted")
-        self.btn_mem = QPushButton("Libertar agora")
-        self.btn_mem.setObjectName("Primary")
-        self.btn_mem.clicked.connect(self.clean_mem)
-        row.addWidget(self.mem_lbl, 1)
-        row.addWidget(self.btn_mem)
-        mem.add(row)
-        self.add(mem)
+        super().__init__("Otimização", "Ajustes de desempenho reversíveis e programas em segundo plano que gastam RAM")
 
         self.perf = TweakList("Ajustes de desempenho",
                               "Cada ajuste guarda o valor original; desligar volta ao que estava.",
@@ -113,6 +100,13 @@ class OptimizePage(Page):
                 tl = TweakList(*titles[cat], items)
                 self.extra.append(tl)
                 self.add(tl)
+
+        retired = tweaks.retired_tweaks()
+        if retired:
+            tl = TweakList("Ajustes retirados", "O Nexo já não recomenda estes ajustes. Desligue-os para repor "
+                           "o que estava antes.", retired)
+            self.extra.append(tl)
+            self.add(tl)
 
         procs = Card("Programas em segundo plano",
                      "Os que mais gastam RAM. Os pré-marcados são seguros de fechar. Fechar pede ao programa para "
@@ -137,24 +131,10 @@ class OptimizePage(Page):
         self.body.addStretch(1)
 
     def on_show(self):
-        import psutil
-        vm = psutil.virtual_memory()
-        self.mem_lbl.setText(f"Em uso: {human_bytes(vm.total - vm.available)} de {human_bytes(vm.total)} "
-                             f"({vm.percent:.0f}%) · disponível {human_bytes(vm.available)}")
         self.perf.refresh()
         for tl in self.extra:
             tl.refresh()
         self.load_procs()
-
-    def clean_mem(self):
-        self.btn_mem.setEnabled(False)
-
-        def done(res):
-            ok, msg = res
-            self.btn_mem.setEnabled(True)
-            notify(msg, "ok" if ok else "bad")
-            self.on_show()
-        run_async(memory.clean_memory, on_done=done)
 
     def load_procs(self):
         run_async(memory.background_processes, on_done=self._procs)

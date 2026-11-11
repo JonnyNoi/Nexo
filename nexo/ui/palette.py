@@ -41,8 +41,7 @@ FEATURES: dict[str, list[tuple[str, str]]] = {
                   ("Análise completa", "sistema todo disco inteiro rootkit minerador"),
                   ("Quarentena", "isolar restaurar apagar ameaça"),
                   ("Atualizar assinaturas", "freshclam definições base de dados")],
-    "Otimização": [("Libertar memória", "ram limpar cache"),
-                   ("Programas em segundo plano", "fechar background"),
+    "Otimização": [("Programas em segundo plano", "ram memória libertar fechar apps pesadas background"),
                    ("Desempenho Máximo", "plano de energia hibernação tweaks ajustes"),
                    ("Menu de contexto clássico", "windows 11 botão direito"), ("Modo escuro", "dark"),
                    ("BBR", "tcp rede linux"), ("NMI watchdog", "linux kernel"), ("Restaurar", "reverter desfazer")],
@@ -313,6 +312,9 @@ class CommandPalette(QWidget):
         out: list[Entry] = []
         for i, name in enumerate(win.names):
             keys = " ".join(f"{t} {k}" for t, k in FEATURES.get(name, []))
+            group = win.btn_of[i].name if hasattr(win, "btn_of") else name
+            if group != name:
+                keys += f" {group}"
             out.append(Entry(name, "Página", win.icons[i], keys, i, None, None, None, 5))
             known = set()
             for e in _page_entries(win, i):

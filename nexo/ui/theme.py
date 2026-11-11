@@ -101,6 +101,7 @@ QFrame#Card QLabel, QFrame#Card QCheckBox, QFrame#Card QRadioButton {{ backgroun
 QFrame#Card QWidget#Transparent, QWidget#Transparent {{ background: transparent; }}
 QFrame#Sidebar {{ background: {side}; border-right: 1px solid {c['border']}; }}
 QFrame#Sidebar QLabel, QFrame#Sidebar QWidget#Transparent {{ background: transparent; }}
+QFrame#SubTabs {{ background: {c['bg']}; border-bottom: 1px solid {c['border']}; }}
 QFrame#LiveBox {{ background: {field}; border: 1px solid {c['border']}; border-radius: 12px; }}
 QFrame#LiveBox QLabel {{ background: transparent; }}
 QFrame#Tip {{ background: {field}; border: 1px solid {c['border']}; border-radius: 12px; }}
