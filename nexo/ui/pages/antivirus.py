@@ -141,7 +141,7 @@ class AntivirusPage(Page):
         self._selected()
 
         # ------------------------------------------------------------ quarentena
-        qc_ = Card("Quarentena", "Ficheiros isolados: estão cifrados e não podem ser executados. "
+        qc_ = Card("Quarentena", "Ficheiros isolados: ficam codificados e sem permissão de execução (não é cifra). "
                                  "Pode restaurá-los se forem falsos alarmes.", icon="shield")
         self.qtable = _table(["Ficheiro", "Local original", "Tamanho", "Data", "Motivo"], 1)
         self.qtable.setColumnWidth(0, 200)
@@ -168,6 +168,12 @@ class AntivirusPage(Page):
         if not self._loaded:
             self._loaded = True
             self._refresh_status()
+        if self.report is None and self.task is None:
+            # resultado da análise agendada (Tarefas agendadas), se for mais recente do que esta sessão
+            from ...core import schedule
+            rep = schedule.load_report()
+            if rep is not None and rep.findings:
+                self._on_done(rep, quiet=True)
 
     def refresh(self):
         self._refresh_status()
@@ -302,7 +308,7 @@ class AntivirusPage(Page):
         self.scan_lbl.setText("")
         notify(f"A análise falhou: {msg}", "bad")
 
-    def _on_done(self, rep: av.Report):
+    def _on_done(self, rep: av.Report, quiet: bool = False):
         self.task = None
         self._busy(False)
         self.report = rep
@@ -330,7 +336,13 @@ class AntivirusPage(Page):
         if rep.engine_note:
             txt += f"<br>{status_dot('warn')} {rep.engine_note}"
         self.summary.setText(txt)
-        notify(f"{what}: " + ("nenhuma ameaça" if kind == "ok" else f"{bad} ameaça(s), {warn} suspeito(s)"), kind)
+        if not quiet:
+            notify(f"{what}: " + ("nenhuma ameaça" if kind == "ok" else f"{bad} ameaça(s), {warn} suspeito(s)"), kind)
+            from ...core import schedule
+            try:
+                schedule.save_report(rep)   # volta a aparecer depois de reabrir o Nexo
+            except OSError:
+                pass
         self._fill(rep.findings)
         self._refresh_status()
 

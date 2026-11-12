@@ -3,10 +3,11 @@ from __future__ import annotations
 import time
 
 import psutil
-from PySide6.QtWidgets import QComboBox, QGridLayout, QHBoxLayout, QPushButton, QWidget
+from PySide6.QtWidgets import QComboBox, QGridLayout, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from ...core import sysinfo
 from ...core.util import IS_LINUX, IS_WIN, human_bytes, human_duration, load_json
+from ...core import healthscore
 from ..widgets import Card, LineChart, Page, Ring, StatTile, hbox, label, run_async
 
 METRICS = {"Temperatura": ("cpu_temp", "gpu_temp", "°C", 100), "Carga": ("cpu_load", "gpu_load", "%", 100),
@@ -18,6 +19,31 @@ class DashboardPage(Page):
     def __init__(self, hub):
         super().__init__("Visão geral", "Estado do PC em tempo real")
         self.hub = hub
+
+        # ---------------------------------------------------------------- saúde do PC (pontuação)
+        self.score_card = Card()
+        self.score_card.setObjectName("Card")
+        sc = QHBoxLayout()
+        sc.setSpacing(22)
+        self.r_score = Ring("Saúde do PC", 118)
+        self.r_score.set(0, "—", "")
+        self.r_score.setAccessibleName("Pontuação da saúde do PC")
+        sc.addWidget(self.r_score)
+        right = QVBoxLayout()
+        right.setSpacing(6)
+        self.score_title = label("A avaliar…", "CardTitle")
+        right.addWidget(self.score_title)
+        self.score_sub = label("Pontuação de 0 a 100 a partir das verificações abaixo.", "Muted", wrap=True)
+        right.addWidget(self.score_sub)
+        self.actions_box = QVBoxLayout()
+        self.actions_box.setSpacing(4)
+        right.addLayout(self.actions_box)
+        right.addStretch(1)
+        sc.addLayout(right, 1)
+        self.score_card.add(sc)
+        self.add(self.score_card)
+        self._slow: list = []
+        self._slow_at = 0.0
 
         grid = QGridLayout()
         grid.setSpacing(16)
@@ -166,6 +192,15 @@ class DashboardPage(Page):
                         None))
         if self._failed_services:
             out.append(("warn", f"{self._failed_services} serviço(s) do sistema com falha.", "Utilitários"))
+        if time.time() - self._slow_at > 60:   # atualizações, antivírus, drivers: só caches, 1×/min
+            self._slow_at = time.time()
+            try:
+                self._slow = healthscore.slow_checks()
+            except Exception:  # noqa: BLE001 — uma cache estragada não pode partir o painel
+                import logging
+                logging.getLogger("nexo.health").warning("Verificações lentas falharam", exc_info=True)
+                self._slow = []
+        out.extend((c.kind, c.text, c.page) for c in self._slow)
         return out
 
     def _disk_health_checks(self) -> list:
@@ -197,6 +232,7 @@ class DashboardPage(Page):
         if key == self._health_key:
             return
         self._health_key = key
+        self._update_score(checks)
         g = self.health_grid
         while g.count():
             w = g.takeAt(0).widget()
@@ -224,6 +260,47 @@ class DashboardPage(Page):
             g.addWidget(cell, r, col)
         for c in range(2):
             g.setColumnStretch(c, 1)
+
+    def _update_score(self, checks):
+        actions = {c.text: c.action for c in self._slow}
+        cs = [healthscore.Check(k, t, p, actions.get(t, "Resolver")) for k, t, p in checks]
+        s = healthscore.score(cs)
+        txt, kind = healthscore.grade(s)
+        self.r_score.set(s, str(s), "de 100", kind)
+        self.score_title.setText(f"Saúde do PC: {txt}")
+        todo = healthscore.top_actions(cs)
+        n_bad = sum(1 for c in cs if c.kind == "bad")
+        n_warn = sum(1 for c in cs if c.kind == "warn")
+        if not todo and not (n_bad or n_warn):
+            self.score_sub.setText("Está tudo em ordem — nada para fazer agora.")
+        else:
+            parts = [f"{n_bad} problema(s)" if n_bad else "", f"{n_warn} aviso(s)" if n_warn else ""]
+            self.score_sub.setText(" e ".join(p for p in parts if p) + ". O mais útil a fazer agora:"
+                                   if todo else " e ".join(p for p in parts if p) + ".")
+        from .. import theme
+        from ..widgets import icon_badge
+        while self.actions_box.count():
+            w = self.actions_box.takeAt(0).widget()
+            if w:
+                w.hide()
+                w.deleteLater()
+        for i, c in enumerate(todo, 1):
+            row = QWidget()
+            row.setObjectName("Transparent")
+            hl = QHBoxLayout(row)
+            hl.setContentsMargins(0, 0, 0, 0)
+            hl.setSpacing(10)
+            hl.addWidget(icon_badge("alert", 24, 13, c.kind))
+            lb = label(f"{i}. {c.text}", wrap=True)
+            if c.kind == "bad":
+                lb.setStyleSheet(f"color: {theme.C['bad']}")
+            hl.addWidget(lb, 1)
+            b = QPushButton(c.action)
+            b.setObjectName("Primary" if i == 1 else "")
+            b.setToolTip(f"Abrir {c.page}")
+            b.clicked.connect(lambda _c=False, p=c.page: self.window().go_name(p))
+            hl.addWidget(b)
+            self.actions_box.addWidget(row)
 
     def _update(self, readings):
         if not self.isVisible():

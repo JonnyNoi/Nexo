@@ -51,6 +51,8 @@ def main() -> int:
     from .ui import crash
     from .ui.main_window import MainWindow
 
+    from .ui import i18n_qt
+    i18n_qt.install(app)    # inglês, se escolhido em Definições → Aparência
     theme.apply(app)
     minimized = "--minimized" in sys.argv or get_setting("start_minimized")
     win = MainWindow(start_hidden=minimized)
@@ -67,6 +69,8 @@ def main() -> int:
 
     if not win._start_hidden:
         win.show()
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(600, win.maybe_first_run)
     code = app.exec()
     nlog.log.info("Nexo terminou (código %s)", code)
     return code

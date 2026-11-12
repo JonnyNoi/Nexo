@@ -129,6 +129,11 @@ class GameModePage(Page):
         det.add(hbox(None, b_rm))
         self.add(det)
 
+        # ---------------------------------------------------------------- perfis por jogo
+        from ..gameprofile_card import GameProfileCard
+        self.gp_card = GameProfileCard()
+        self.add(self.gp_card)
+
         # ---------------------------------------------------------------- sessões
         ses = Card("Sessões de jogo", "Tempo jogado, FPS e temperaturas de cada sessão — guardado automaticamente "
                    "quando o jogo fecha.", icon="chart")
@@ -271,6 +276,8 @@ class GameModePage(Page):
     def on_show(self):
         self._refresh_now()
         self._load_sessions()
+        w = self._win()
+        self.gp_card.refresh(w.game.name if w is not None and w.game is not None else None)
         self.timer.start(1000)
         if not self._lib_loaded:
             self._lib_loaded = True

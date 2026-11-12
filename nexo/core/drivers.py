@@ -190,7 +190,18 @@ def evaluate(drivers: list[DriverInfo], pending: list | None = None, online: boo
     return drivers
 
 
+CACHE = "drivers.json"
+
+
 def check(online: bool = True) -> list[DriverInfo]:
+    from dataclasses import asdict
+
     from . import updates
-    return evaluate(installed(), updates.items(updates.cached()), online)
+    from .util import save_json
+    res = evaluate(installed(), updates.items(updates.cached()), online)
+    try:   # o painel (Saúde do PC) lê o último resultado sem voltar a verificar
+        save_json(CACHE, {"time": time.time(), "items": [asdict(d) for d in res]})
+    except OSError:
+        pass
+    return res
 

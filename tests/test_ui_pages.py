@@ -107,6 +107,66 @@ class UiSmoke(unittest.TestCase):
                 self.win.go_name(name)
                 self.assertEqual(self.win.names[self.win.current], name)
 
+    def test_alert_center(self):
+        from nexo.core import alertlog
+        w = self.win
+        alertlog.clear()
+        w._alert("Temperatura da CPU alta: 95 °C (limite 90 °C)", "bad")
+        w._alert("Pouco espaço no disco /: só 2 GB livres", "warn", "Espaço em disco")
+        self.assertEqual(w.btn_bell.count, 2)
+        w.open_alerts()
+        self.app.processEvents()
+        self.assertFalse(w.alert_box.isHidden())
+        rows = [r for r in w.alert_box.inner.findChildren(type(w.alert_box.panel)) if r.objectName() == "AlertRow"]
+        self.assertEqual(len(rows), 2)
+        w.alert_box._open_alert(alertlog.all_alerts()[0])        # "Abrir" leva à página
+        self.assertEqual(w.names[w.current], "Espaço em disco")
+        self.assertTrue(w.alert_box.isHidden())
+        self.assertEqual(w.btn_bell.count, 0)                     # fechar marca tudo como lido
+
+    def test_health_score_card(self):
+        w = self.win
+        w.go_name("Visão geral")
+        page = w.pages[w.current]
+        page._update_score([("bad", "Disco quase cheio", "Espaço em disco"), ("warn", "RAM", "Processos"),
+                            ("ok", "Tudo bem", None)])
+        self.assertIn("Saúde do PC", page.score_title.text())
+        self.assertEqual(page.r_score.center, "67")
+        self.assertEqual(page.actions_box.count(), 2)
+
+    def test_tasks_page_and_wizard(self):
+        from nexo.core import schedule
+        from nexo.ui.wizard import ShortcutsDialog, Wizard
+        w = self.win
+        w.go_name("Tarefas agendadas")
+        page = w.pages[w.current]
+        cb, info, _btn = page.rows["clean"]
+        cb.setCurrentIndex(cb.findData(7))
+        self.assertEqual(schedule.interval(schedule.get("clean")), 7)
+        self.assertIn("Próxima", info.text())
+        wiz = Wizard(w)
+        for _ in range(wiz.stack.count() - 1):
+            wiz._step(1)
+        self.assertEqual(wiz.b_next.text(), "Começar")
+        wiz._step(1)
+        from nexo.core.util import get_setting
+        self.assertTrue(get_setting("wizard_done"))
+        ShortcutsDialog(w).close()
+
+    def test_game_profile_card(self):
+        from nexo.core import gameprofile
+        w = self.win
+        w.go_name("Modo jogo")
+        card = w.pages[w.current].gp_card
+        card.game_cb.setEditText("Jogo de Teste")
+        card.power_cb.setCurrentIndex(card.power_cb.findData("performance"))
+        if gameprofile.power_available():
+            self.assertEqual(gameprofile.power_for("Jogo de Teste"), "performance")
+        card.ov_cb.setCurrentIndex(card.ov_cb.findData("off"))
+        self.assertFalse(gameprofile.overlay_for("Jogo de Teste", True))
+        card._reset()
+        self.assertFalse(gameprofile.has_profile("Jogo de Teste"))
+
 
 if __name__ == "__main__":
     unittest.main()

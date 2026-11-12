@@ -98,37 +98,46 @@ class SettingsPage(Page):
         btn_log.clicked.connect(self._open_log)
         about.add(hbox(label(f"{APP_NAME} {APP_VERSION} · dados em {config_dir()}", "Muted", wrap=True), None,
                        btn_log, btn_dir))
-        about.add(label("<b>Atalhos:</b> Ctrl+1…Ctrl+9 mudar de página · Ctrl+Tab página seguinte · "
-                        "F5 atualizar · Ctrl+, definições · Ctrl+Q sair", "Muted", wrap=True))
+        b_wiz = QPushButton("Assistente de boas-vindas")
+        b_wiz.setToolTip("Voltar a ver o assistente da primeira execução")
+        b_wiz.clicked.connect(lambda: self.window().show_wizard())
+        b_keys = QPushButton("Atalhos de teclado (F1)")
+        b_keys.clicked.connect(lambda: self.window().show_shortcuts())
+        about.add(hbox(label("<b>Atalhos:</b> Ctrl+K pesquisa · Ctrl+1…Ctrl+9 mudar de página · Ctrl+Shift+A alertas "
+                             "· F5 atualizar · F1 todos os atalhos", "Muted", wrap=True), None, b_keys, b_wiz))
         self.add(about)
         self.body.addStretch(1)
 
     # ------------------------------------------------------------------ limpeza automática
     def _build_autoclean(self):
-        from ...core import autoclean
+        from ...core import autoclean, schedule
         c = Card("Limpeza automática", "Limpa sozinho, de tempos a tempos, só o que se refaz sem custo e não precisa "
                  "de palavra-passe. O Lixo, as caches dos navegadores e dos jogos ficam sempre para si decidir.",
                  icon="broom")
         self.cb_clean = QComboBox()
-        for days, txt in autoclean.INTERVALS.items():
+        for days, txt in schedule.INTERVALS.items():
             self.cb_clean.addItem(txt, days)
         self.cb_clean.setCurrentIndex(max(0, self.cb_clean.findData(int(get_setting("auto_clean_days") or 0))))
         self.cb_clean.currentIndexChanged.connect(self._autoclean_changed)
         names = ", ".join(x.name.lower() for x in autoclean.categories()) or "—"
         self.lb_clean = label("", "Muted", wrap=True)
         c.add(SettingRow("Frequência", f"Inclui: {names}.", self.cb_clean))
-        c.add(self.lb_clean)
+        b_tasks = QPushButton("Ver todas as tarefas agendadas")
+        b_tasks.setObjectName("Ghost")
+        b_tasks.clicked.connect(lambda: self.window().go_name("Tarefas agendadas"))
+        c.add(hbox(self.lb_clean, None, b_tasks))
         self._autoclean_info()
         self.add(c)
 
     def _autoclean_changed(self, _i):
-        days = int(self.cb_clean.currentData() or 0)
-        set_setting("auto_clean_days", days)
-        if days and not get_setting("auto_clean_last"):
-            set_setting("auto_clean_last", time.time() - days * 86400)   # primeira limpeza no próximo ciclo
+        from ...core import schedule
+        schedule.set_interval(schedule.get("clean"), int(self.cb_clean.currentData() or 0))
         self._autoclean_info()
 
     def _autoclean_info(self):
+        self.cb_clean.blockSignals(True)
+        self.cb_clean.setCurrentIndex(max(0, self.cb_clean.findData(int(get_setting("auto_clean_days") or 0))))
+        self.cb_clean.blockSignals(False)
         last = float(get_setting("auto_clean_last") or 0)
         freed = int(get_setting("auto_clean_freed") or 0)
         parts = []
@@ -137,7 +146,6 @@ class SettingsPage(Page):
         if freed:
             parts.append(f"total libertado: {human_bytes(freed)}")
         self.lb_clean.setText(" · ".join(parts))
-        self.lb_clean.setVisible(bool(parts))
 
     # ------------------------------------------------------------------ cópia das definições
     def _build_backup(self):
@@ -294,7 +302,27 @@ class SettingsPage(Page):
         row.addStretch(1)
         row.addWidget(b_wp)
         ap.add(row)
+        ap.add(separator())
+        from ...core import i18n
+        self.lang_cb = QComboBox()
+        for k, v in i18n.LANGS.items():
+            self.lang_cb.addItem(v, k)
+        self.lang_cb.setCurrentIndex(max(0, self.lang_cb.findData(i18n.lang())))
+        self.lang_cb.currentIndexChanged.connect(self._lang_changed)
+        ap.add(SettingRow("Idioma", "Idioma da interface. Muda depois de reiniciar o Nexo.", self.lang_cb))
         self.add(ap)
+
+    def _lang_changed(self, _i):
+        from ...core import i18n
+        new = self.lang_cb.currentData()
+        set_setting("language", new)
+        if new == i18n.lang():
+            return
+        if confirm(self, "Idioma / Language", "Reiniciar o Nexo agora para mudar o idioma?\n"
+                   "Restart Nexo now to change the language?"):
+            win = self.window()
+            if hasattr(win, "restart_app"):
+                win.restart_app()
 
     def _pick_theme(self, key):
         for k, b in self.theme_btns.items():

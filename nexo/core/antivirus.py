@@ -6,8 +6,10 @@ Duas camadas:
      no arranque/cron/tarefas agendadas, ficheiro hosts sequestrado, ficheiros com extensão dupla,
      executáveis em pastas temporárias, rootkits conhecidos, etc.
 
-Nada é apagado automaticamente: os ficheiros vão para uma quarentena (cifrados com XOR, sem permissão
-de execução) e podem ser restaurados.
+Nada é apagado automaticamente: os ficheiros vão para uma quarentena e podem ser restaurados. Lá ficam
+codificados com XOR e sem permissão de execução — isto NÃO é cifra (quem tiver acesso à pasta consegue
+descodificá-los); serve só para que não possam ser executados nem apanhados por outros programas.
+A integridade é confirmada por SHA-256 ao restaurar.
 """
 from __future__ import annotations
 
@@ -15,6 +17,7 @@ import os
 import queue
 import re
 import shlex
+import shutil
 import stat
 import subprocess
 import sys
@@ -968,7 +971,9 @@ def defender_remove() -> tuple[bool, str]:
 
 
 # --------------------------------------------------------------------------- quarentena
+# Codificação (não é cifra): impede que o ficheiro seja executado ou reconhecido por outros programas.
 _KEY = 0xA5
+_qid_lock = threading.Lock()
 
 
 def _qdir() -> Path:
@@ -978,16 +983,25 @@ def _qdir() -> Path:
 
 
 def quarantine_list() -> list[dict]:
-    return load_json("quarentena.json", [])
+    lst = load_json("quarentena.json", [])
+    return lst if isinstance(lst, list) else []
 
 
-def _xor_copy(src: str, dst: str) -> None:
+def _xor_copy(src: str, dst: str, decode: bool = False) -> str:
+    """Copia src → dst aplicando o XOR. Devolve o SHA-256 do conteúdo ORIGINAL (descodificado)."""
+    import hashlib
+    h = hashlib.sha256()
     with open(src, "rb") as fi, open(dst, "wb") as fo:
         while True:
             b = fi.read(1 << 20)
             if not b:
                 break
-            fo.write(_xor_fast(b))
+            x = _xor_fast(b)
+            h.update(x if decode else b)
+            fo.write(x)
+        fo.flush()
+        os.fsync(fo.fileno())
+    return h.hexdigest()
 
 
 def _xor_fast(b: bytes) -> bytes:
@@ -996,18 +1010,36 @@ def _xor_fast(b: bytes) -> bytes:
     return (n ^ mask).to_bytes(len(b), "little")
 
 
+def _new_qid() -> str:
+    """Identificador único (duas quarentenas no mesmo milissegundo não se podem sobrepor)."""
+    with _qid_lock:
+        base = int(time.time() * 1000)
+        n = 0
+        while True:
+            qid = f"{base}" if n == 0 else f"{base}-{n}"
+            if not (_qdir() / f"{qid}.nexoq").exists() and not any(x.get("id") == qid for x in quarantine_list()):
+                # reserva já o nome (outra thread não o pode escolher)
+                try:
+                    with open(_qdir() / f"{qid}.nexoq", "xb"):
+                        pass
+                    return qid
+                except FileExistsError:
+                    pass
+            n += 1
+
+
 def quarantine(path: str, reason: str) -> tuple[bool, str]:
     if not path or not os.path.isfile(path):
         return False, "O ficheiro já não existe."
-    qid = f"{int(time.time() * 1000)}"
-    dst = _qdir() / f"{qid}.nexoq"
     try:
         mode = stat.S_IMODE(os.stat(path).st_mode)
         size = os.path.getsize(path)
     except OSError as e:
         return False, str(e)
+    qid = _new_qid()
+    dst = _qdir() / f"{qid}.nexoq"
     try:
-        _xor_copy(path, str(dst))
+        digest = _xor_copy(path, str(dst))
         os.remove(path)
     except PermissionError:
         dst.unlink(missing_ok=True)
@@ -1020,7 +1052,11 @@ def quarantine(path: str, reason: str) -> tuple[bool, str]:
         if code != 0:
             plain.unlink(missing_ok=True)
             return False, _tail(out)
-        _xor_copy(str(plain), str(dst))
+        try:
+            digest = _xor_copy(str(plain), str(dst))
+        except OSError as e:
+            # o original já foi apagado pelo root: o texto simples fica onde está para não se perder
+            return False, f"{e} — o ficheiro ficou em {plain}"
         plain.unlink(missing_ok=True)
     except OSError as e:
         dst.unlink(missing_ok=True)
@@ -1032,54 +1068,82 @@ def quarantine(path: str, reason: str) -> tuple[bool, str]:
     with _save_lock:  # várias ações em paralelo não podem perder entradas (o ficheiro ficaria órfão)
         lst = quarantine_list()
         lst.append({"id": qid, "name": os.path.basename(path), "original": path, "mode": mode, "size": size,
-                    "when": time.time(), "reason": reason})
+                    "sha256": digest, "when": time.time(), "reason": reason})
         save_json("quarentena.json", lst)
     return True, f"{os.path.basename(path)} foi para a quarentena (já não pode ser executado)."
 
 
 def quarantine_restore(qid: str) -> tuple[bool, str]:
-    lst = quarantine_list()
-    it = next((x for x in lst if x["id"] == qid), None)
+    it = next((x for x in quarantine_list() if x.get("id") == qid), None)
     if not it:
         return False, "Item não encontrado."
     src = _qdir() / f"{qid}.nexoq"
+    if not src.is_file():
+        return False, "O ficheiro da quarentena desapareceu."
     orig = it["original"]
-    if os.path.exists(orig):
+    if os.path.lexists(orig):
         return False, f"Já existe um ficheiro em {orig}."
+    plain = _qdir() / f"{qid}.restaurar"
     try:
-        os.makedirs(os.path.dirname(orig), exist_ok=True)
-        _xor_copy(str(src), orig)
-        os.chmod(orig, it.get("mode", 0o644))
-    except PermissionError:
-        if IS_WIN:
-            return False, "Sem permissão — execute o Nexo como administrador."
-        plain = _qdir() / f"{qid}.tmp"
-        _xor_copy(str(src), str(plain))
-        code, out = run_root(f"install -m {it.get('mode', 0o644):o} -- {shlex.quote(str(plain))} "
-                             f"{shlex.quote(orig)}", timeout=120)
+        digest = _xor_copy(str(src), str(plain), decode=True)
+    except OSError as e:
         plain.unlink(missing_ok=True)
+        return False, str(e)
+    if it.get("sha256") and digest != it["sha256"]:
+        plain.unlink(missing_ok=True)
+        return False, "O ficheiro da quarentena está danificado (SHA-256 diferente) — não foi restaurado."
+    mode = int(it.get("mode", 0o644)) & 0o7777
+    tmp = os.path.join(os.path.dirname(orig) or ".", f".{os.path.basename(orig)}.nexo-restaurar")
+    try:
+        os.makedirs(os.path.dirname(orig) or ".", exist_ok=True)
+        shutil.copyfile(plain, tmp)           # escreve ao lado e só no fim troca (nunca fica meio ficheiro)
+        os.chmod(tmp, mode)
+        os.replace(tmp, orig)
+    except PermissionError:
+        _unlink(tmp)
+        if IS_WIN:
+            plain.unlink(missing_ok=True)
+            return False, "Sem permissão — execute o Nexo como administrador."
+        code, out = run_root(f"install -m {mode:o} -- {shlex.quote(str(plain))} {shlex.quote(orig)}", timeout=120)
         if code != 0:
+            plain.unlink(missing_ok=True)
             return False, _tail(out)
     except OSError as e:
+        _unlink(tmp)
+        plain.unlink(missing_ok=True)
         return False, str(e)
+    plain.unlink(missing_ok=True)
     _q_remove(qid)
     return True, f"{it['name']} restaurado em {orig}."
 
 
+def _unlink(path: str) -> None:
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+
 def quarantine_delete(qid: str) -> tuple[bool, str]:
-    _q_remove(qid)
+    if not _q_remove(qid):
+        return False, "Não foi possível apagar o ficheiro da quarentena."
     return True, "Apagado definitivamente."
 
 
-def _q_remove(qid: str) -> None:
+def _q_remove(qid: str) -> bool:
     p = _qdir() / f"{qid}.nexoq"
+    ok = True
     try:
         os.chmod(p, 0o600)
         p.unlink()
-    except OSError:
+    except FileNotFoundError:
         pass
-    with _save_lock:
-        save_json("quarentena.json", [x for x in quarantine_list() if x["id"] != qid])
+    except OSError:
+        ok = False
+    if ok:
+        with _save_lock:
+            save_json("quarentena.json", [x for x in quarantine_list() if x.get("id") != qid])
+    return ok
 
 
 def finding_dict(f: Finding) -> dict:

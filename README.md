@@ -15,20 +15,22 @@ stress test, benchmark de CPU, otimização, **instalador de aplicações**, rep
 
 ## Funcionalidades
 
-Algumas entradas do menu juntam várias páginas, com separadores no topo: **Discos** (Saúde dos discos + Espaço em disco), **Otimização** (Otimização + Arranque + Windows debloat), **Testes** (Benchmark + Stress test) e **Software** (Atualizações + Instalar aplicações).
+Algumas entradas do menu juntam várias páginas, com separadores no topo: **Discos** (Saúde dos discos + Espaço em disco), **Otimização** (Otimização + Arranque + Windows debloat), **Testes** (Benchmark + Stress test), **Software** (Atualizações + Instalar aplicações) e **Utilitários** (Utilitários + Tarefas agendadas).
+
+Na primeira execução abre um **assistente de boas-vindas** (tema, avisos, pontos de restauro, bandeja, tarefas automáticas, modo jogo) — pode voltar a vê-lo em Definições.
 
 | Página | O que faz |
 |---|---|
-| **Visão geral** | Resumo do hardware, gráfico CPU × GPU (temperatura / carga / consumo, 1–15 min), anéis de RAM / VRAM / disco, rede e disco ao vivo e **Saúde do sistema** (temperaturas, RAM, espaço, swap, tempo ligado, serviços com falha) com botão "Resolver". |
+| **Visão geral** | **Saúde do PC**: pontuação de 0 a 100 com as 3 ações mais úteis do momento (cada uma com botão para a página certa) — junta as verificações ao vivo com atualizações pendentes, drivers antigos, última análise antivírus e pontos de restauro. Resumo do hardware, gráfico CPU × GPU (temperatura / carga / consumo, 1–15 min), anéis de RAM / VRAM / disco, rede e disco ao vivo e **Saúde do sistema** (temperaturas, RAM, espaço, swap, tempo ligado, serviços com falha) com botão "Resolver". |
 | **Informação** | SO, CPU (caches, instruções), RAM (módulos no Windows / com root no Linux), GPU (VRAM, PCIe, VBIOS, OpenGL/Vulkan), placa-mãe/BIOS, Secure Boot, discos e rede. **Exportar relatório** em HTML ou JSON. |
 | **Sensores** | Todas as leituras com atual/mín./máx. (registados mesmo com a página fechada), filtros por tipo e pesquisa. **Gravar CSV** de todas as leituras 1×/s. Linux: hwmon (coretemp/k10temp, amdgpu, nvme, SPD…), RAPL, amdgpu sysfs. Windows: WMI + **LibreHardwareMonitor** (o Nexo transfere a versão oficial com SHA-256 verificado, abre-a escondida na bandeja e fecha-a à saída; todos os sensores dele aparecem). NVIDIA via `nvidia-smi` em ambos. |
 | **Saúde dos discos** | **Velocidade do disco** (leitura/escrita sequencial e aleatória 4K sem a cache da memória — O_DIRECT / FILE_FLAG_NO_BUFFERING). Dados **S.M.A.R.T.** de cada disco (NVMe, SSD SATA, HDD): veredicto **Bom / Atenção / Mau**, **vida restante** dos SSD, temperatura, horas ligado, dados escritos/lidos, desligamentos inesperados, setores realocados/pendentes, erros CRC (cabo) e todos os atributos. **Autoteste rápido** do disco. O resultado aparece também na Saúde do sistema. Linux: `smartctl` (o Nexo oferece-se para instalar o smartmontools; pede a palavra-passe uma vez por leitura). Windows: `smartctl` se existir, senão o que o Windows reporta (Get-PhysicalDisk). |
 | **Processos** | Gestor de tarefas leve: CPU/memória/threads por processo, ordenar, procurar, **Terminar** / **Forçar fim** (tecla Delete), prioridade, abrir a pasta do programa. Atualiza a cada 2 s só com a página aberta. |
-| **Antivírus** | Windows: Microsoft Defender. Linux: ClamAV (o Nexo instala-o) + heurísticas próprias. Análise rápida/completa, quarentena cifrada (nunca apaga sozinho). |
+| **Antivírus** | Windows: Microsoft Defender. Linux: ClamAV (o Nexo instala-o) + heurísticas próprias. Análise rápida/completa, quarentena (ficheiros codificados e verificados por SHA-256; nunca apaga sozinho). |
 | **Otimização** | Ajustes de desempenho e — ao estilo do WinUtil — **ajustes do sistema e da interface** (plano Desempenho Máximo, hibernação, "Terminar tarefa" na barra, menu de contexto clássico, modo escuro, Teclas Presas, ecrã azul detalhado, preferir IPv4…). Linux: BBR, NMI watchdog, split-lock, inotify. Tudo reversível. Fechar programas em segundo plano. |
 | **Stress test** | CPU em todos os threads (FPU + inteiros) e/ou RAM (escreve e verifica 7 padrões). Pára no limite de temperatura, no fim do tempo ou ao detetar erro de memória. Gráfico e registo. |
 | **Benchmark** | **Placa gráfica:** cena 3D em OpenGL (ray marching com sombras, oclusão ambiente e reflexos) em 1080p/1440p/4K num processo à parte; nota = FPS × 10 (RX 6500 XT ≈ 1500 em 1080p). **CPU:** path tracer próprio (iluminação global, metal, vidro com refração) multi-core e single-core. Imagem determinística, nota = amostras/s ÷ 1000, histórico. Referência: i5-12400F ≈ 1290 multi / 196 single. |
-| **Modo jogo** | **Deteta o jogo que está a correr** (Steam/Proton com o nome verdadeiro, Wine, Lutris, Heroic, Epic, GOG, Xbox, pastas de jogos ou programas que marcar) e mostra um **overlay** por cima do jogo: temperatura e carga da CPU/GPU, consumo, RAM, VRAM, tempo de jogo e relógio — posição, formato (detalhado/compacto), opacidade e itens configuráveis; não apanha cliques. Ao fechar o jogo mostra o resumo da sessão e guarda-a no **histórico de sessões** (tempo jogado por jogo, FPS médio, 1 % low, mínimo e temperaturas máximas; 7/30 dias ou desde sempre). **Jogos instalados** de todas as lojas com tamanho, **Jogar** e **Pasta**. Funciona com jogos em janela/ecrã inteiro sem bordas. |
+| **Modo jogo** | **Deteta o jogo que está a correr** (Steam/Proton com o nome verdadeiro, Wine, Lutris, Heroic, Epic, GOG, Xbox, pastas de jogos ou programas que marcar) e mostra um **overlay** por cima do jogo: temperatura e carga da CPU/GPU, consumo, RAM, VRAM, tempo de jogo e relógio — posição, formato (detalhado/compacto), opacidade e itens configuráveis; não apanha cliques. **Perfis por jogo:** ventoinhas, perfil de energia, overlay, programas a fechar quando o jogo arranca (pedido normal de fecho) e, no Linux, o **Feral GameMode** — tudo volta ao normal quando o jogo fecha. Ao fechar o jogo mostra o resumo da sessão e guarda-a no **histórico de sessões** (tempo jogado por jogo, FPS médio, 1 % low, mínimo e temperaturas máximas; 7/30 dias ou desde sempre). **Jogos instalados** de todas as lojas com tamanho, **Jogar** e **Pasta**. Funciona com jogos em janela/ecrã inteiro sem bordas. |
 | **Ventoinhas** | Perfis **Automático / Silencioso / Equilibrado / Desempenho / Máximo / Personalizado** com **curva arrastável** (temperatura → rotação), escolha da temperatura que cada ventoinha segue (CPU, GPU ou a mais quente), 100 % automático acima de 90 °C, nunca abaixo de 20 %, e devolução ao controlo do hardware quando o Nexo fecha. Opcional: mudar o perfil de energia junto e passar a «Desempenho» durante os jogos. Linux: canais PWM do kernel (placa gráfica AMD e, com o controlador nct6775/it87 — o Nexo ajuda a carregá-lo —, a motherboard); a permissão é pedida uma única vez. Windows: recomenda o FanControl. |
 | **Atualizações** | Mostra **o que há para atualizar** — pacotes do sistema (pacman via `checkupdates`, com plano B na base de dados local se os mirrors não responderem; apt, dnf, zypper), **AUR** (paru/yay), **Flatpak** e, no Windows, **winget** — com versão instalada e nova, filtro por origem e **Atualizar tudo** (ou **Abrir no terminal**, que inclui o AUR). Verifica sozinho a cada 6 h (só com internet) e mostra o número no menu lateral. **Drivers da placa gráfica:** versão do Mesa/NVIDIA (Linux, comparada com a última versão publicada e com as atualizações pendentes) ou do driver do fabricante (Windows, avisa se tiver mais de 6 meses). |
 | **Instalar aplicações** | ~60 aplicações populares por categoria (navegadores, jogos, multimédia, programação, utilitários, componentes). Marque e instale todas de uma vez, desinstale ou **atualize todas**. Windows: **winget**. Linux: **Flatpak/Flathub** (sem palavra-passe). |
@@ -37,15 +39,18 @@ Algumas entradas do menu juntam várias páginas, com separadores no topo: **Dis
 | **Windows debloat** *(só Windows)* | Remove apps pré-instaladas (Notícias, Clipchamp, Cortana, Copilot, Candy Crush, TikTok, McAfee de teste…) e desliga telemetria, ID de publicidade, Recall, sugestões/anúncios, pesquisa Bing, Widgets. Tudo com **Restaurar originais**. Não mexe em Defender, SmartScreen, UAC nem Windows Update. |
 | **Espaço em disco** | **Analisa o disco do sistema logo ao abrir** e classifica cada pasta: 🟢 **Seguro apagar** (caches, temporários, lixo, logs, node_modules/.venv, Windows.old, transferências do Windows Update…), 🔵 **Seguro — desinstalar** (jogos da Steam com o nome do jogo, Epic, GOG, Xbox, Heroic, Lutris, programas), 🟡 **Rever antes** (documentos, fotos, transferências, VMs, definições das apps) e 🔴 **Sistema — não apagar** (`C:\Windows`, System32, WinSxS, pagefile/hiberfil, Program Files, `/usr`, `/etc`, `/boot`, swap, snapshots…). Resumo com quanto pode libertar, lista **Pode ser apagado** (botão *Marcar os seguros*), **Explorar por pasta** (árvore), maiores ficheiros/pastas, duplicados (em segundo plano) e espaço por tipo. Itens do sistema ficam **protegidos** (não se deixam apagar); jogos da Steam abrem o desinstalador da Steam. **Limpeza rápida**: lixo, caches de navegadores/apps/shaders/programação, temporários, Windows Update, pacotes antigos (pacman/apt/dnf), journal, Flatpak, Docker… |
 | **Fundo de ecrã** | Muda o **wallpaper do ambiente de trabalho** do sistema: Windows, KDE Plasma, GNOME, Cinnamon, MATE, XFCE, LXQt, Sway, Hyprland (swww/hyprpaper) ou feh/nitrogen. Imagem própria ou **galeria do Wallhaven**, ajuste (preencher, ajustar, esticar, centrar, mosaico, vários ecrãs), opcionalmente também no **ecrã de bloqueio**, **Os meus fundos** e **troca automática** (dos seus fundos ou aleatório do Wallhaven). |
+| **Tarefas agendadas** | O que o Nexo faz sozinho e quando: **limpeza automática**, **análise antivírus rápida** (só avisa; o resultado aparece na página Antivírus) e **saúde dos discos** (no Windows corre; no Linux só lembra, porque precisa da palavra-passe). Diária, semanal, quinzenal ou mensal, com próxima e última execução. Nunca corre durante um jogo. |
 | **Internet** | Teste de velocidade (Cloudflare), latência com a ligação cheia, o que a ligação permite, diagnóstico passo a passo e **programas a usar a internet** (Linux: velocidade e total por programa via `ss`; Windows: ligações por programa). |
-| **Definições** | Tema **escuro** ou **claro**, alertas (temperatura, RAM, disco, S.M.A.R.T.), pontos de restauro, histórico dos sensores, bandeja, **limpeza automática** (semanal/quinzenal/mensal, só o que é 100 % seguro e sem palavra-passe), **cópia das definições** (exportar/importar .zip com definições, benchmarks e sessões de jogo) e **atualizações do próprio Nexo** (releases do GitHub com SHA-256 verificado; `UPDATE_REPO` em `nexo/core/util.py`). |
+| **Definições** | Tema **escuro** ou **claro**, **idioma** (português ou inglês — beta: o menu, os títulos das páginas e as funcionalidades novas já estão traduzidos; o resto vai sendo traduzido), alertas (temperatura, RAM, disco, S.M.A.R.T.), pontos de restauro, histórico dos sensores, bandeja, **limpeza automática** (semanal/quinzenal/mensal, só o que é 100 % seguro e sem palavra-passe), **cópia das definições** (exportar/importar .zip com definições, benchmarks e sessões de jogo) e **atualizações do próprio Nexo** (releases do GitHub com SHA-256 verificado; `UPDATE_REPO` em `nexo/core/util.py`). |
 
 
 Tema escuro/claro (guardado), ícones próprios, notificações flutuantes, leitura de CPU/GPU/RAM sempre visível no menu.
 **Menu lateral:** secções que recolhem com um clique (lembradas entre sessões), **modo compacto só com ícones** (botão no fundo do menu ou Ctrl+B), barra de destaque na página ativa e contadores (ex.: atualizações pendentes).
 **Bandeja do sistema:** ícone com a temperatura da CPU, dica com CPU/GPU/RAM e avisos de sobreaquecimento.
+**Centro de alertas (sino no fundo do menu, Ctrl+Shift+A):** todos os avisos (temperatura, RAM, discos, S.M.A.R.T., jogos, tarefas, atualizações) ficam guardados com a hora, repetições agrupadas, contador de não lidos e botão para a página que resolve.
+**Acessibilidade:** navegação completa pelo teclado (Tab mostra um contorno no elemento com foco; o rato não), nomes acessíveis nos botões só com ícone e nos interruptores, e cores com contraste WCAG AA nos dois temas (verificado em `tests/test_contrast.py`).
 **Pesquisa rápida (Ctrl+K ou "Procurar…" no menu):** encontra páginas, funções, opções e temas — mesmo sem acentos — e leva diretamente até lá, abre o separador certo e destaca o elemento.
-**Atalhos:** Ctrl+K pesquisa rápida · Ctrl+1…9 mudar de página · Ctrl+Tab / Ctrl+Shift+Tab · F5 atualizar · Ctrl+, definições · Ctrl+Q sair.
+**Atalhos (F1 mostra a lista):** Ctrl+K pesquisa rápida · Ctrl+1…9 mudar de página · Ctrl+Tab / Ctrl+Shift+Tab · Ctrl+Shift+A alertas · Ctrl+B menu compacto · F5 atualizar · Ctrl+, definições · Ctrl+Q sair.
 Só abre uma instância (abrir de novo traz a janela para a frente); `--minimized` arranca na bandeja.
 
 ### Desempenho
@@ -81,8 +86,28 @@ no Windows use o botão **Admin** no menu (ou o `.exe` gerado, que já pede admi
   `--instalador` gera também `Nexo-Instalador-<versão>.exe` (Inno Setup: menu Iniciar, atalho, desinstalar)
 - **Pacote do Arch / CachyOS:** `sh packaging/arch/build.sh` (`--instalar` instala-o com o pacman)
 
-O `.exe` não está assinado digitalmente (é preciso um certificado de assinatura de código pago), por isso o
-SmartScreen avisa na primeira execução noutros PCs: «Mais informações» → «Executar mesmo assim».
+### Versões (GitHub Releases) e atualizações automáticas
+
+Publicar uma etiqueta gera tudo no GitHub Actions (`.github/workflows/release.yml`): testes → `Nexo` (Linux,
+Ubuntu 22.04 para correr em mais distribuições) + `Nexo.exe` + instalador → release com `SHA256SUMS`.
+```sh
+# APP_VERSION em nexo/core/util.py tem de ser igual à etiqueta (o workflow confirma)
+git tag -a v2.2 -m "Nexo 2.2" && git push origin v2.2
+```
+Para o Nexo instalado se atualizar sozinho, ponha o repositório em `UPDATE_REPO` (`nexo/core/util.py`, ex.:
+`"utilizador/nexo"`): verifica uma vez por dia, confirma o SHA-256 que o GitHub publica e pede autorização.
+
+### Assinatura do .exe (SmartScreen)
+
+Sem assinatura, o SmartScreen avisa na primeira execução noutros PCs («Mais informações» → «Executar mesmo
+assim»). Para assinar:
+- **No GitHub Actions:** guarde o certificado de assinatura de código como segredos do repositório —
+  `WINDOWS_CERT_PFX` (o .pfx em base64: `base64 -w0 cert.pfx`) e `WINDOWS_CERT_PASSWORD`. O `Nexo.exe` e o
+  instalador passam a sair assinados e com carimbo temporal (`packaging/windows/sign.ps1`).
+- **No build local (wine):** `NEXO_SIGN_PFX=/caminho/cert.pfx NEXO_SIGN_PASS=… ./build_windows_wine.sh --instalador`
+  (precisa do `osslsigncode`).
+- Projetos de código aberto podem pedir um certificado gratuito ao [SignPath Foundation](https://signpath.org/);
+  um certificado OV comum tira o aviso depois de ganhar reputação, um EV tira-o logo.
 
 ## Onde ficam os dados
 
@@ -102,6 +127,8 @@ Definições → «Abrir registo de erros».
 ```sh
 .venv/bin/python -m unittest discover -s tests -t .
 ```
+Tradução: `python -m nexo.core.i18n [ficheiros]` lista os textos que ainda não têm tradução para inglês
+(catálogo em `nexo/core/i18n_en.py`; textos com valores no meio vão em `TEMPLATES`).
 Correm também no GitHub Actions (Linux e Windows) a cada push — `.github/workflows/testes.yml`.
 
 ## Estrutura
@@ -114,9 +141,12 @@ nexo/
     diskscan.py disksafety.py cleanup.py autoclean.py smart.py   diskbench.py  antivirus.py
     games.py    sessions.py fps.py      fans.py      lhm.py        network.py    netprocs.py
     speedtest.py history.py snapshot.py watch.py     backup.py     selfupdate.py
+    alertlog.py healthscore.py schedule.py gameprofile.py i18n.py i18n_en.py
     wallhaven.py desktopwp.py log.py    util.py
   ui/          interface Qt
-    main_window.py  palette.py  theme.py  widgets.py  icons.py  logo.py  historyview.py
+    main_window.py (menu, navegação, bandeja)  nav.py (peças do menu)  mw_background.py (vigilância,
+    tarefas, atualizações)  mw_game.py (modo jogo)  alertcenter.py  wizard.py  gameprofile_card.py
+    i18n_qt.py  palette.py  theme.py  widgets.py  icons.py  logo.py  historyview.py
     overlay.py  netmonitor.py  hwcontrol.py  crash.py  wallhaven_dialog.py  pages/*.py
 tests/         testes (unittest)
 packaging/     arch/PKGBUILD · windows/nexo.iss (instalador)

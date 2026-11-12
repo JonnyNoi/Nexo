@@ -15,7 +15,7 @@ IS_LINUX = sys.platform.startswith("linux")
 
 APP_NAME = "Nexo"
 LEGACY_NAME = "PCForge"  # nome antigo (para migrar definições)
-APP_VERSION = "2.1"
+APP_VERSION = "2.2"
 # repositório GitHub ("dono/nome") de onde o Nexo procura versões novas (releases com os ficheiros
 # "Nexo" e "Nexo.exe"). Vazio = sem verificação de atualizações do próprio Nexo.
 UPDATE_REPO = ""
@@ -66,6 +66,20 @@ def load_json(name: str, default):
 _save_lock = threading.RLock()
 
 
+def _replace(tmp: Path, p: Path, tries: int = 20) -> None:
+    """os.replace com novas tentativas: no Windows falha com "Acesso negado" se outra thread (ou o
+    antivírus) tiver o ficheiro aberto nesse instante — fica livre ao fim de poucos milissegundos."""
+    import time
+    for i in range(tries):
+        try:
+            tmp.replace(p)
+            return
+        except PermissionError:
+            if not IS_WIN or i == tries - 1:
+                raise
+            time.sleep(0.01 * (i + 1))
+
+
 def save_json(name: str, data) -> None:
     """Grava de forma atómica: escreve num temporário único e só depois substitui o ficheiro."""
     p = config_dir() / name
@@ -74,7 +88,7 @@ def save_json(name: str, data) -> None:
         tmp = p.with_name(f".{p.name}.{os.getpid()}.{threading.get_ident()}.tmp")
         try:
             tmp.write_text(text, encoding="utf-8")
-            tmp.replace(p)
+            _replace(tmp, p)
         finally:
             if tmp.exists():
                 try:

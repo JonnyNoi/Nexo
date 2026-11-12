@@ -36,6 +36,13 @@ mkdir -p Aplicacao/Windows
 wine "$PY" -m PyInstaller --noconfirm --clean --onefile --windowed --uac-admin --name Nexo --icon "Z:$PWD/assets/nexo.ico" \
      --distpath 'Aplicacao\Windows' --workpath 'build\windows' --specpath 'build\windows' \
      run_nexo.py || exit 1
+sign() {   # assinatura opcional: NEXO_SIGN_PFX=/caminho/cert.pfx NEXO_SIGN_PASS=… ./build_windows_wine.sh
+    [ -n "$NEXO_SIGN_PFX" ] || return 0
+    command -v osslsigncode >/dev/null || { echo "Instale o osslsigncode para assinar."; return 1; }
+    osslsigncode sign -pkcs12 "$NEXO_SIGN_PFX" -pass "$NEXO_SIGN_PASS" -n Nexo -h sha256 \
+        -ts http://timestamp.digicert.com -in "$1" -out "$1.assinado" && mv "$1.assinado" "$1" && echo "Assinado: $1"
+}
+sign Aplicacao/Windows/Nexo.exe || exit 1
 echo "Pronto: Aplicacao/Windows/Nexo.exe"
 
 [ "$1" = "--instalador" ] || exit 0
@@ -55,4 +62,5 @@ fi
 VER=$(sed -n 's/^APP_VERSION = "\(.*\)"/\1/p' nexo/core/util.py)
 echo "» A gerar o instalador…"
 wine "$ISCC" /Q "/DAppVersion=$VER" 'packaging\windows\nexo.iss' || exit 1
+sign "Aplicacao/Windows/Nexo-Instalador-$VER.exe" || exit 1
 echo "Pronto: Aplicacao/Windows/Nexo-Instalador-$VER.exe"

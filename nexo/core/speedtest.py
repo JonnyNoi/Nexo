@@ -272,7 +272,7 @@ def duration_for(nbytes: float, mbps: float) -> str:
         return f"~{s:.0f} s"
     if s < 5400:
         return f"~{s / 60:.0f} min"
-    return f"~{s / 3600:.1f} h"
+    return f"~{s / 3600:.1f} h".replace(".", ",")
 
 
 def bufferbloat(r: SpeedResult) -> tuple[str, str] | None:

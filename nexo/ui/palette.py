@@ -20,7 +20,8 @@ from .widgets import SettingRow, icon_badge, label
 
 # página → [(função, palavras-chave extra)]; a função é procurada na página para a destacar
 FEATURES: dict[str, list[tuple[str, str]]] = {
-    "Visão geral": [("CPU × GPU", "gráfico temperatura carga consumo watts"),
+    "Visão geral": [("Saúde do PC", "pontuação nota estado geral o que fazer recomendações"),
+                    ("CPU × GPU", "gráfico temperatura carga consumo watts"),
                     ("Saúde do sistema", "resolver problemas avisos serviços com falha swap tempo ligado"),
                     ("Utilização", "ram vram disco rede anéis")],
     "Informação": [("Exportar relatório", "html json guardar especificações specs hardware"),
@@ -63,6 +64,9 @@ FEATURES: dict[str, list[tuple[str, str]]] = {
                     ("Funcionalidades do Windows", "wsl hyper-v sandbox .net"),
                     ("Windows Update", "atualizações segurança drivers"),
                     ("Painéis clássicos", "painel de controlo")],
+    "Tarefas agendadas": [("Limpeza automática", "agendar automático semanal mensal limpar caches temporários"),
+                          ("Análise antivírus rápida", "agendada automática vírus semanal"),
+                          ("Saúde dos discos (S.M.A.R.T.)", "lembrete agendado smart disco")],
     "Arranque": [("Arranque", "startup autostart iniciar com o sistema systemd programas ao ligar")],
     "Windows debloat": [("Apps pré-instaladas", "remover bloatware candy crush tiktok cortana copilot clipchamp"),
                         ("Telemetria", "privacidade publicidade recall bing widgets anúncios sugestões"),
@@ -79,6 +83,7 @@ FEATURES: dict[str, list[tuple[str, str]]] = {
                                            "pacotes antigos navegadores shaders")],
     "Modo jogo": [("Overlay", "fps temperaturas por cima do jogo osd hud mangohud"),
                   ("Deteção de jogos", "steam proton wine lutris heroic epic gog detetar"),
+                  ("Perfis por jogo", "perfil jogo energia desempenho fechar programas gamemode feral ventoinhas"),
                   ("Jogos instalados", "biblioteca jogar lançar")],
     "Ventoinhas": [("Perfil de ventoinhas", "fan silencioso equilibrado desempenho máximo ruído rpm pwm"),
                    ("Curva personalizada", "curva temperatura rotação fan curve"),

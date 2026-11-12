@@ -171,7 +171,11 @@ class FanManager(QObject):
         """Perfil de energia acompanha o perfil de jogo; no fim volta ao que estava antes."""
         if not get_setting("fan_power_sync"):
             return
-        want = fc.PROFILES[self.game_profile()].get("power") if self.game_profile() else None
+        from ..core import gameprofile
+        if self.game and gameprofile.power_for(self.game):
+            want = None   # o perfil do jogo escolhe a energia (Modo jogo → Perfis por jogo)
+        else:
+            want = fc.PROFILES[self.game_profile()].get("power") if self.game_profile() else None
         if want:
             first = self._power_before is None
             if first:

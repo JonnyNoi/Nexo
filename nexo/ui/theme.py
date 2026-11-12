@@ -1,8 +1,9 @@
 """Temas (tokens de cor + folha de estilos Qt) e fundo animado de cada tema."""
 from __future__ import annotations
 
+from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QColor, QFont, QFontDatabase
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QAbstractButton, QApplication
 
 from ..core.util import get_setting, set_setting
 
@@ -20,9 +21,10 @@ THEMES: dict[str, dict] = {
     "escuro": _t("Escuro", None, "#0a0c11", "#12151c", "#191d27", "#242a37", "#1e2330", "#2d3444", "#e9ecf3",
                  "#8a93a8", "#6d8bff", "#9b6dff", "#1c2350", "#3ddc97", "#fbbf24", "#f87171", "#60a5fa",
                  ["#6d8bff", "#22d3ee", "#3ddc97", "#c084fc", "#fbbf24", "#f472b6"]),
+    # cores do tema claro escolhidas para contraste WCAG AA (≥ 4,5:1 para texto) — ver tests/test_contrast.py
     "claro": _t("Claro", None, "#f4f5fa", "#ffffff", "#f3f4f9", "#e7e9f1", "#e3e6ee", "#d2d7e2", "#141824",
-                "#636c80", "#4f6bff", "#8a4dff", "#e9edff", "#059669", "#b45309", "#dc2626", "#2563eb",
-                ["#4f6bff", "#0891b2", "#059669", "#8a4dff", "#d97706", "#db2777"], light=True),
+                "#5b6477", "#3a55e6", "#8a4dff", "#e9edff", "#047857", "#b45309", "#c42020", "#2563eb",
+                ["#3a55e6", "#0891b2", "#059669", "#8a4dff", "#d97706", "#db2777"], light=True),
 }
 GROUPS = {"Temas": ["escuro", "claro"]}
 DARK, LIGHT = THEMES["escuro"], THEMES["claro"]   # compatibilidade
@@ -79,6 +81,10 @@ def stylesheet() -> str:
     glow = _rgba(c["accent"], 0.10 if not light else 0.07)
     glow2 = _rgba(c["accent2"], 0.06 if not light else 0.04)
     nav_on = _rgba(c["accent"], 0.22 if not light else 0.12)
+    # fundo dos botões principais: no tema escuro um pouco mais escuro para o texto branco ter contraste AA
+    deep = c["accent"] if light or c["accent_text"] != "#ffffff" else _mix(c["accent"], "#000000", 0.25)
+    deep2 = c["accent2"] if light or c["accent_text"] != "#ffffff" else _mix(c["accent2"], "#000000", 0.25)
+    focus = c["accent"] if not light else _mix(c["accent"], "#000000", 0.1)
     nav_off = _rgba(c["accent"], 0.03)
     # cartões e menu com um gradiente subtil (sem fundos animados por baixo)
     card = f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {card_top}, stop:1 {card_bot})"
@@ -138,19 +144,23 @@ QPushButton:hover {{ background: {c['surface3']}; border-color: {_mix(c['border2
 QPushButton:pressed {{ background: {c['border2']}; }}
 QPushButton:disabled {{ color: {c['muted']}; background: {c['surface']}; }}
 QPushButton:checked {{ background: {c['surface3']}; border-color: {c['accent']}; }}
-QPushButton#Primary {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {c['accent']}, stop:1 {c['accent2']});
+QPushButton#Primary {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {deep}, stop:1 {deep2});
     color: {c['accent_text']}; border: 1px solid {_rgba('#ffffff', 0.10)}; }}
-QPushButton#Primary:hover {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {_mix(c['accent'], '#ffffff', 0.12)}, stop:1 {_mix(c['accent2'], '#ffffff', 0.12)}); }}
-QPushButton#Primary:pressed {{ background: {c['accent']}; }}
+QPushButton#Primary:hover {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {_mix(deep, '#ffffff', 0.10)}, stop:1 {_mix(deep2, '#ffffff', 0.10)}); }}
+QPushButton#Primary:pressed {{ background: {deep}; }}
 QPushButton#Primary:disabled {{ background: {c['surface3']}; color: {c['muted']}; }}
 QPushButton#Danger {{ background: transparent; color: {c['bad']}; border: 1px solid {c['bad']}; }}
-QPushButton#Danger:hover {{ background: {c['bad']}; color: white; }}
+QPushButton#Danger:hover {{ background: {c['bad']}; color: {'white' if light else c['bg']}; }}
 QPushButton#Danger:disabled {{ color: {c['muted']}; border-color: {c['border']}; }}
 QPushButton#Ghost {{ background: transparent; border: none; color: {c['muted']}; padding: 4px 8px; }}
 QPushButton#Ghost:hover {{ color: {c['text']}; background: {c['surface2']}; }}
 QPushButton#Chip {{ padding: 5px 14px; border-radius: 14px; font-weight: 600; background: {c['surface2']}; color: {c['muted']}; }}
 QPushButton#Chip:hover {{ color: {c['text']}; }}
-QPushButton#Chip:checked {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {c['accent']}, stop:1 {c['accent2']}); color: {c['accent_text']}; border-color: transparent; }}
+QPushButton#Chip:checked {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {deep}, stop:1 {deep2}); color: {c['accent_text']}; border-color: transparent; }}
+/* foco do teclado (os botões só ganham foco com Tab — ver theme.KeyboardFocus) */
+QPushButton:focus, QPushButton#Ghost:focus, QPushButton#Chip:focus, QPushButton#Nav:focus, QPushButton#SearchBtn:focus {{ border: 2px solid {focus}; }}
+QCheckBox:focus, QRadioButton:focus {{ color: {focus}; }}
+QTableView:focus, QTreeView:focus, QListView:focus {{ border: 1px solid {_rgba(focus, 0.6)}; }}
 QLineEdit, QComboBox, QSpinBox {{
     background: {field}; border: 1px solid {c['border']}; border-radius: 10px; padding: 7px 11px;
     selection-background-color: {c['accent']}; selection-color: {c['accent_text']};
@@ -284,6 +294,19 @@ def _apply_wallpaper_accent() -> None:
     C["series"] = [a1, a2] + [c for c in C["series"][2:]]
 
 
+class KeyboardFocus(QObject):
+    """Os botões só recebem foco com o teclado (Tab), não com o rato: assim o contorno de foco aparece
+    só a quem navega pelo teclado (o equivalente a :focus-visible)."""
+
+    def eventFilter(self, obj, e):
+        if e.type() == QEvent.Polish and isinstance(obj, QAbstractButton) and obj.focusPolicy() == Qt.StrongFocus:
+            obj.setFocusPolicy(Qt.TabFocus)
+        return False
+
+
+_focus_filter: KeyboardFocus | None = None
+
+
 def apply(app: QApplication, key: str | None = None) -> None:
     """Aplica um tema (chave de THEMES). Aceita também "dark"/"light" (definições antigas)."""
     global _key
@@ -293,6 +316,10 @@ def apply(app: QApplication, key: str | None = None) -> None:
     if key not in THEMES:  # temas antigos: claros passam a "claro", os restantes a "escuro"
         key = "claro" if key in ("verao", "kawaii") else "escuro"
     _key = key
+    global _focus_filter
+    if _focus_filter is None:
+        _focus_filter = KeyboardFocus(app)
+        app.installEventFilter(_focus_filter)
     C.clear()
     C.update(THEMES[key])
     C["series"] = list(C["series"])

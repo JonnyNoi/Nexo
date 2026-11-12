@@ -7,9 +7,10 @@ from collections import deque
 
 from PySide6.QtCore import QObject, QPointF, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import (QAbstractButton, QFrame, QHBoxLayout, QLabel, QMessageBox, QScrollArea,
-                               QSizePolicy, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractButton, QAbstractSpinBox, QComboBox, QFrame, QHBoxLayout, QLabel,
+                               QMessageBox, QScrollArea, QSizePolicy, QSlider, QVBoxLayout, QWidget)
 
+from ..core.i18n import tr
 from ..core.util import TaskCancelled
 from . import theme
 from .theme import qc
@@ -411,8 +412,8 @@ class Ring(QWidget):
         p.drawText(QRectF(0, 0, s, s - 8), Qt.AlignCenter, self.center)
         p.setFont(scaled(self.font(), 0.8, False))
         p.setPen(qc("muted"))
-        p.drawText(QRectF(0, s / 2 + 8, s, 18), Qt.AlignCenter, self.sub)
-        p.drawText(QRectF(0, s, s, 20), Qt.AlignCenter, self.title)
+        p.drawText(QRectF(0, s / 2 + 8, s, 18), Qt.AlignCenter, tr(self.sub))
+        p.drawText(QRectF(0, s, s, 20), Qt.AlignCenter, tr(self.title))
         p.end()
 
 
@@ -478,7 +479,20 @@ class Toggle(QAbstractButton):
         x = r.right() - d - 3 if on else r.left() + 3
         p.setBrush(QColor("white"))
         p.drawEllipse(QRectF(x, r.top() + 3, d, d))
+        if self.hasFocus():   # contorno de foco (navegação pelo teclado)
+            p.setOpacity(1.0)
+            p.setBrush(Qt.NoBrush)
+            p.setPen(QPen(qc("accent"), 2))
+            p.drawRoundedRect(QRectF(self.rect()).adjusted(1, 1, -1, -1), r.height() / 2 + 1, r.height() / 2 + 1)
         p.end()
+
+    def focusInEvent(self, e):
+        super().focusInEvent(e)
+        self.update()
+
+    def focusOutEvent(self, e):
+        super().focusOutEvent(e)
+        self.update()
 
 
 class SettingRow(QWidget):
@@ -511,6 +525,11 @@ class SettingRow(QWidget):
             box.setObjectName("Transparent")
             box.setLayout(right)
             right = box
+        # leitores de ecrã: o controlo à direita fica com o nome e a descrição da linha
+        for w in [right, *right.findChildren(QWidget)]:
+            if isinstance(w, (QAbstractButton, QComboBox, QAbstractSpinBox, QSlider)) and not w.accessibleName():
+                w.setAccessibleName(title)
+                w.setAccessibleDescription(desc)
         h.addWidget(right, 0, Qt.AlignVCenter)
 
 

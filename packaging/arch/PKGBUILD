@@ -1,7 +1,7 @@
 # Pacote do Nexo para Arch Linux / CachyOS / Manjaro.
 # Gerar a partir do repositório:  sh packaging/arch/build.sh   (cria nexo-<versão>.tar.gz e corre o makepkg)
 pkgname=nexo
-pkgver=2.1
+pkgver=2.2
 pkgrel=1
 pkgdesc="Utilitário do PC: sensores, saúde dos discos, otimização, modo jogo, ventoinhas, limpeza e benchmarks"
 arch=('any')
@@ -13,7 +13,8 @@ optdepends=('smartmontools: saúde dos discos (S.M.A.R.T.)'
             'mangohud: contador de FPS no modo jogo'
             'clamav: antivírus'
             'flatpak: instalar aplicações'
-            'snapper: pontos de restauro antes de alterar o sistema')
+            'snapper: pontos de restauro antes de alterar o sistema'
+            'gamemode: Feral GameMode nos perfis por jogo')
 source=("$pkgname-$pkgver.tar.gz")
 sha256sums=('SKIP')
 

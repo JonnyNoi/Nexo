@@ -3,6 +3,7 @@ name: Testes
 on:
   push:
   pull_request:
+  workflow_call:      # usado também pelo release.yml antes de gerar os executáveis
 
 jobs:
   testes:
