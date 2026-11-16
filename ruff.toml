@@ -1,0 +1,13 @@
+# Verificação no CI (Testes): só regras que apanham erros reais — nomes indefinidos, imports em falta,
+# sintaxe, armadilhas clássicas (flake8-bugbear). Estilo não é imposto.
+target-version = "py310"
+line-length = 120
+extend-exclude = ["build", "Aplicacao", "packaging"]
+
+[lint]
+select = ["F", "E9", "B"]
+ignore = [
+    "B007",  # variável do ciclo não usada — inofensivo
+    "B008",  # chamada em argumento por omissão — usado de propósito
+    "B905",  # zip() sem strict= — o código assume comprimentos iguais
+]

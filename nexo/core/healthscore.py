@@ -57,6 +57,8 @@ def slow_checks(now: float | None = None) -> list[Check]:
     out += _antivirus(now)
     out += _drivers()
     out += _protection()
+    out += _reliability(now)
+    out += _throttling(now)
     return out
 
 
@@ -97,6 +99,32 @@ def _drivers() -> list[Check]:
         more = f" (+{len(old) - 1})" if len(old) > 1 else ""
         return [Check("warn", f"Driver desatualizado: {name}{more}.", "Atualizações", "Ver")]
     return []
+
+
+def _reliability(now: float) -> list[Check]:
+    """Um único desligar sem aviso pode ter sido o botão de reset — só é grave a partir do segundo."""
+    from . import reliability as rel
+    s = rel.summary(rel.events(), now=now, days=7)
+    serious = {c: n for c, n in s.items() if rel.CATEGORIES[c][1] == "bad" and (c != "shutdown" or n >= 2)}
+    if serious:
+        what = ", ".join(f"{rel.CATEGORIES[c][0].lower()} ({n}×)" for c, n in serious.items())
+        return [Check("bad", f"Problemas de estabilidade esta semana: {what}.", "Fiabilidade", "Ver")]
+    if s.get("shutdown"):
+        return [Check("warn", "O PC desligou-se sem aviso uma vez esta semana.", "Fiabilidade", "Ver")]
+    if s.get("gpu", 0) >= 2 or s.get("memory", 0) >= 2:
+        return [Check("warn", "O controlador gráfico ou a memória falharam várias vezes esta semana.", "Fiabilidade",
+                      "Ver")]
+    return []
+
+
+def _throttling(now: float) -> list[Check]:
+    from . import throttle
+    eps = throttle.recent(7, now)
+    if not eps:
+        return []
+    comps = sorted({throttle.NAMES[e.comp].lower() for e in eps})
+    return [Check("warn", f"Limitação por temperatura esta semana: {len(eps)}× ({', '.join(comps)}).", "Fiabilidade",
+                  "Ver")]
 
 
 def _protection() -> list[Check]:

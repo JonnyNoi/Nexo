@@ -6,11 +6,12 @@ EN: dict[str, str] = {
     "Visão geral": "Overview", "Informação": "Information", "Sensores": "Sensors", "Discos": "Disks",
     "Saúde dos discos": "Disk health", "Espaço em disco": "Disk space", "Processos": "Processes",
     "Antivírus": "Antivirus", "Otimização": "Optimisation", "Arranque": "Startup", "Windows debloat": "Windows debloat",
-    "Modo jogo": "Game mode", "Ventoinhas": "Fans", "Testes": "Tests", "Benchmark": "Benchmark",
+    "Modo jogo": "Game mode", "Fiabilidade": "Reliability", "Testes": "Tests", "Benchmark": "Benchmark",
     "Stress test": "Stress test", "Software": "Software", "Atualizações": "Updates",
     "Instalar aplicações": "Install apps", "Internet": "Internet", "Utilitários": "Utilities",
     "Tarefas agendadas": "Scheduled tasks", "Fundo de ecrã": "Wallpaper", "Definições": "Settings",
     "Procurar…": "Search…", "Pesquisa rápida": "Quick search",
+    "Porque está lento?": "Why is it slow?", "Diagnosticar agora": "Diagnose now",
     "Pesquisa rápida: páginas, funções, opções e temas (Ctrl+K)": "Quick search: pages, features, options and themes (Ctrl+K)",
     "Tema escuro ou claro": "Dark or light theme", "Tema": "Theme", "Menu compacto": "Compact menu",
     "Mudar o fundo do ambiente de trabalho…": "Change the desktop wallpaper…", "a verificar…": "checking…",
@@ -39,8 +40,6 @@ EN: dict[str, str] = {
         "Removes preinstalled apps and turns off telemetry, ads and suggestions. Nothing that lowers security (Defender, SmartScreen, UAC, Windows Update).",
     "Deteta quando está a jogar e mostra temperaturas e uso por cima do jogo":
         "Detects when you're gaming and shows temperatures and usage over the game",
-    "Perfis de ruído e arrefecimento, curva própria e estado de cada ventoinha.":
-        "Noise and cooling profiles, custom curve and the state of each fan.",
     "Carga máxima na CPU (todos os threads) e/ou teste de RAM com verificação de erros. Pára sozinho ao atingir o limite de temperatura.":
         "Full CPU load (all threads) and/or RAM test with error checking. Stops by itself at the temperature limit.",
     "CPU: path tracer próprio (iluminação global, reflexos, vidro com refração). Placa gráfica: cena 3D em OpenGL. Imagens sempre iguais — as notas comparam-se entre PCs.":
@@ -128,7 +127,7 @@ EN: dict[str, str] = {
     "Proteger": "Protect", "Otimizar": "Optimise", "Aparência": "Appearance",
     "Temperaturas, carga, discos e saúde do PC em tempo real.": "Temperatures, load, disks and PC health in real time.",
     "Avisos, antivírus, pontos de restauro antes de mexer no sistema.": "Alerts, antivirus, restore points before changing the system.",
-    "Limpeza, arranque, ventoinhas e um modo jogo com overlay e perfis.": "Cleanup, startup, fans and a game mode with overlay and profiles.",
+    "Limpeza, arranque, testes e um modo jogo com overlay e perfis.": "Cleanup, startup, tests and a game mode with overlay and profiles.",
     "Escolha o tema. Muda já, para ver como fica.": "Pick a theme. It changes right away so you can see it.",
     "Só ícones no menu lateral, para dar mais espaço às páginas (Ctrl+B alterna a qualquer momento).":
         "Icons only in the side menu, leaving more room for pages (Ctrl+B toggles any time).",
@@ -145,11 +144,10 @@ EN: dict[str, str] = {
     "Tarefas automáticas": "Automatic tasks",
     "O que o Nexo faz sozinho de tempos a tempos (nunca durante um jogo). Pode ver e mudar tudo em Utilitários → Tarefas agendadas.":
         "What Nexo does on its own from time to time (never during a game). You can see and change it all in Utilities → Scheduled tasks.",
-    "Jogos e ventoinhas": "Games and fans",
+    "Jogos": "Games",
     "O modo jogo deteta Steam, Proton, Wine, Lutris, Heroic, Epic, GOG e Xbox.": "Game mode detects Steam, Proton, Wine, Lutris, Heroic, Epic, GOG and Xbox.",
     "Detetar jogos": "Detect games", "Verifica a cada 4 segundos (quase não gasta nada).": "Checks every 4 seconds (uses almost nothing).",
     "Overlay ao jogar": "Overlay while gaming", "Temperaturas, FPS e uso por cima do jogo.": "Temperatures, FPS and usage over the game.",
-    "Configurar ventoinhas no fim": "Set up fans at the end",
     "Perfis silencioso/equilibrado/desempenho e curvas próprias. O Nexo só mexe nelas se escolher um perfil.":
         "Silent/balanced/performance profiles and custom curves. Nexo only touches them if you pick a profile.",
     "O menu está agrupado: SISTEMA para ver o estado do PC, DESEMPENHO para o otimizar e FERRAMENTAS para o resto. Comece pela Visão geral — a «Saúde do PC» diz o que vale a pena fazer.":

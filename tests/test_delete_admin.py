@@ -28,8 +28,9 @@ class DeleteAsAdmin(unittest.TestCase):
         calls = []
 
         def fake_root(cmd, timeout=300):
+            self.assertIsInstance(cmd, list)   # argumentos diretos, sem shell
             calls.append(cmd)
-            return util.run(["sh", "-c", cmd])
+            return util.run(cmd)
         with mock.patch.object(util, "run_root", fake_root):
             done, err = util.delete_as_admin([str(a), str(b)])
         self.assertEqual(len(calls), 1)
@@ -55,12 +56,14 @@ class DeleteAsAdmin(unittest.TestCase):
         calls = []
 
         def fake_root(cmd, timeout=300):
+            self.assertIsInstance(cmd, list)   # argumentos diretos, sem shell
             calls.append(cmd)
-            return util.run(["sh", "-c", cmd])
+            return util.run(cmd)
         with mock.patch.object(util, "run_root", fake_root):
             done, err = util.delete_as_admin([str(a), "/etc"])
         self.assertEqual(done, [str(a)])
         self.assertNotIn("/etc", calls[0])
+        self.assertEqual(calls[0][:3], ["rm", "-rf", "--"])
         self.assertIn("recusados", err)
 
     def test_windows_never_uses_shell(self):
@@ -88,6 +91,28 @@ class DeleteAsAdmin(unittest.TestCase):
         self.assertEqual(done, [])
         self.assertTrue(err)
         self.assertTrue(a.exists())
+
+
+class RunRoot(unittest.TestCase):
+    """run_root com lista: vai ao pkexec com o caminho absoluto do programa e sem passar pelo shell."""
+
+    def _call(self, cmd):
+        with mock.patch.object(util, "IS_WIN", False), mock.patch("os.geteuid", return_value=1000), \
+                mock.patch.object(util, "which", lambda n: f"/usr/bin/{n}"), \
+                mock.patch.object(util, "run", return_value=(0, "")) as run:
+            util.run_root(cmd)
+        return run.call_args[0][0]
+
+    def test_list_skips_shell(self):
+        weird = "/tmp/a b'; rm -rf ~ $(x)"
+        self.assertEqual(self._call(["rm", "-rf", "--", weird]),
+                         ["pkexec", "/usr/bin/rm", "-rf", "--", weird])
+
+    def test_string_still_uses_shell(self):
+        self.assertEqual(self._call("a && b"), ["pkexec", "/usr/bin/sh", "-c", "a && b"])
+
+    def test_empty_list(self):
+        self.assertEqual(util.run_root([])[0], 1)
 
 
 if __name__ == "__main__":

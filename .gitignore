@@ -13,3 +13,4 @@ packaging/arch/src/
 packaging/arch/pkg/
 packaging/windows/Output/
 Aplicacao/Windows/Nexo-Instalador-*.exe
+Aplicacao/Linux/*.AppImage

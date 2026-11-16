@@ -1,7 +1,6 @@
 """Perfis por jogo: o que muda quando um jogo arranca e volta ao normal quando fecha.
 
 Para cada jogo (pelo nome que o Modo jogo deteta):
-  • ventoinhas  — guardado à parte (hwcontrol.set_game_profile / fan_game_profiles);
   • energia     — perfil de energia durante o jogo ("" = não mudar); o anterior é reposto no fim;
   • overlay     — "" = como nas definições gerais, "on" = sempre, "off" = nunca;
   • fechar      — programas a fechar quando o jogo arranca (pedido normal de fecho, nunca à força);
@@ -14,7 +13,7 @@ import os
 
 import psutil
 
-from .util import IS_LINUX, IS_WIN, get_setting, run, set_setting, which
+from .util import IS_LINUX, get_setting, run, set_setting, which
 
 KEY = "game_profiles"
 POWER_CHOICES = {"": "Não mudar", "performance": "Desempenho", "balanced": "Equilibrado",
@@ -49,7 +48,7 @@ def set_value(game: str, key: str, value) -> None:
 
 
 def has_profile(game: str) -> bool:
-    return game in _all() or game in (get_setting("fan_game_profiles") or {})
+    return game in _all()
 
 
 def power_for(game: str | None) -> str:
@@ -64,7 +63,7 @@ def overlay_for(game: str | None, general: bool) -> bool:
 
 def known_games() -> list[str]:
     """Jogos para escolher no editor: os que já têm perfil + os das sessões guardadas."""
-    names = set(_all()) | set(get_setting("fan_game_profiles") or {})
+    names = set(_all())
     try:
         from . import sessions
         names |= {s.name for s in sessions.recent(300)}
@@ -146,4 +145,5 @@ def gamemode_register(pid: int, on: bool) -> tuple[bool, str]:
 
 
 def power_available() -> bool:
-    return IS_WIN or (IS_LINUX and bool(which("powerprofilesctl")))
+    from .power import available
+    return available()

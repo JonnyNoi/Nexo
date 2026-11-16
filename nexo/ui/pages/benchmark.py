@@ -5,7 +5,7 @@ import os
 import time
 
 from PySide6.QtCore import QProcess, Qt
-from PySide6.QtGui import QImage, QPainter, QPixmap
+from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QHeaderView, QLabel, QProgressBar, QPushButton, QSizePolicy,
                                QTableWidget, QTableWidgetItem)
 
@@ -98,11 +98,17 @@ class BenchmarkPage(Page):
 
         self._build_gpu()
 
-        hist = Card("Histórico")
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Data", "Modo", "Qualidade", "Nota", "Processador / placa"])
+        hist = Card("Histórico", "«Diferença» compara com o teste anterior igual (mesmo modo, qualidade e hardware) "
+                    "e diz o que mudou no PC entretanto — para saber se um ajuste ajudou de facto. Abaixo de "
+                    "3 % é variação normal.", icon="clock")
+        self.compare_lbl = label("", "Muted", wrap=True)
+        self.compare_lbl.setTextFormat(Qt.RichText)
+        self.compare_lbl.hide()
+        hist.add(self.compare_lbl)
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(["Data", "Modo", "Qualidade", "Nota", "Diferença", "Processador / placa"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setMinimumHeight(180)
@@ -111,11 +117,52 @@ class BenchmarkPage(Page):
         self._load_history()
 
     def _load_history(self):
+        from ...core import changes
         hist = load_json("bench_history.json", [])
         self.table.setRowCount(len(hist))
+        from .. import theme
+        colors = {"melhor": theme.C["ok"], "pior": theme.C["bad"]}
         for i, h in enumerate(reversed(hist)):
-            for j, v in enumerate((h["date"], h["mode"], h.get("quality", ""), f"{h['score']:.0f}", h.get("cpu", ""))):
-                self.table.setItem(i, j, QTableWidgetItem(v))
+            cmp = changes.compare(hist, h)
+            diff = ""
+            if cmp is not None:
+                diff = f"{'+' if cmp.delta_pct >= 0 else '−'}{abs(cmp.delta_pct):.1f} %"
+            for j, v in enumerate((h["date"], h["mode"], h.get("quality", ""), f"{h['score']:.0f}", diff,
+                                   h.get("cpu", ""))):
+                it = QTableWidgetItem(v)
+                if j == 4 and cmp is not None:
+                    if cmp.verdict in colors:
+                        it.setForeground(QColor(colors[cmp.verdict]))
+                    tip = cmp.text()
+                    if cmp.changes:
+                        tip += "\n\n" + "\n".join("• " + c.get("text", "") for c in cmp.changes[-12:])
+                    it.setToolTip(tip)
+                self.table.setItem(i, j, it)
+
+    def _add_history(self, entry: dict) -> str:
+        """Grava o resultado e devolve o texto da comparação com o teste anterior igual ("" se não houver)."""
+        from ...core import changes
+        entry = {"date": time.strftime("%Y-%m-%d %H:%M"), "ts": time.time(), **entry}
+        hist = load_json("bench_history.json", [])
+        hist.append(entry)
+        save_json("bench_history.json", hist[-30:])
+        self._load_history()
+        cmp = changes.compare(hist, entry)
+        if cmp is None:
+            self.compare_lbl.hide()
+            return ""
+        icon = {"melhor": "▲", "pior": "▼"}.get(cmp.verdict, "＝")
+        lines = [f"<b>{icon} {entry['mode']}: {cmp.text()}</b>"]
+        if cmp.changes:
+            lines += ["• " + c.get("text", "") for c in cmp.changes[-8:]]
+            if len(cmp.changes) > 8:
+                lines.append(f"… e mais {len(cmp.changes) - 8}.")
+        elif cmp.verdict != "igual":
+            lines.append("O Nexo não registou mudanças entretanto — a diferença pode vir de programas abertos, "
+                         "temperatura ou atualizações feitas fora do Nexo.")
+        self.compare_lbl.setText("<br>".join(lines))
+        self.compare_lbl.show()
+        return cmp.text()
 
     def toggle(self):
         if self.running:
@@ -197,11 +244,8 @@ class BenchmarkPage(Page):
         self.progress.setValue(1000)
         self.t_score.set(f"{score:.0f}", f"pontos · {meta['mode']}", "ok")
         self.t_time.set(f"{el:.1f} s", f"{samples / 1e6:.1f} M amostras")
-        hist = load_json("bench_history.json", [])
-        hist.append({"date": time.strftime("%Y-%m-%d %H:%M"), "score": score, "cpu": cpu_model(), **meta})
-        save_json("bench_history.json", hist[-30:])
-        self._load_history()
-        notify(f"Benchmark {meta['mode']}: {score:.0f} pontos", "ok")
+        cmp = self._add_history({"score": score, "cpu": cpu_model(), **meta})
+        notify(f"Benchmark {meta['mode']}: {score:.0f} pontos" + (f" ({cmp})" if cmp else ""), "ok")
 
     # ------------------------------------------------------------------ placa gráfica
     def _build_gpu(self):
@@ -316,12 +360,9 @@ class BenchmarkPage(Page):
                 os.remove(r["image"])
             except OSError:
                 pass
-        hist = load_json("bench_history.json", [])
-        hist.append({"date": time.strftime("%Y-%m-%d %H:%M"), "score": r["score"], "cpu": r["renderer"],
-                     "mode": "Placa gráfica", "quality": self.gpu_res.currentText()})
-        save_json("bench_history.json", hist[-30:])
-        self._load_history()
-        notify(f"Placa gráfica: {r['score']} pontos ({r['fps']:.0f} FPS)", "ok")
+        cmp = self._add_history({"score": r["score"], "cpu": r["renderer"], "mode": "Placa gráfica",
+                                 "quality": self.gpu_res.currentText()})
+        notify(f"Placa gráfica: {r['score']} pontos ({r['fps']:.0f} FPS)" + (f" — {cmp}" if cmp else ""), "ok")
 
     def shutdown(self):
         if self.gpu_proc is not None:

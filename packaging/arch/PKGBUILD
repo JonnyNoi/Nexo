@@ -1,7 +1,7 @@
 # Pacote do Nexo para Arch Linux / CachyOS / Manjaro.
 # Gerar a partir do repositório:  sh packaging/arch/build.sh   (cria nexo-<versão>.tar.gz e corre o makepkg)
 pkgname=nexo
-pkgver=2.2
+pkgver=2.3
 pkgrel=1
 pkgdesc="Utilitário do PC: sensores, saúde dos discos, otimização, modo jogo, ventoinhas, limpeza e benchmarks"
 arch=('any')

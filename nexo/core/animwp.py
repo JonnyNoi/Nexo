@@ -204,7 +204,8 @@ def stop(restore_still: bool = False) -> None:
 def player_command(path: str, style: str) -> list[str]:
     args = ["--wallpaper-player", path, "--style", style]
     if getattr(sys, "frozen", False):
-        return [sys.executable, *args]
+        from .util import self_executable
+        return [self_executable(), *args]
     exe = sys.executable
     if IS_WIN:   # sem janela de consola
         w = os.path.join(os.path.dirname(exe), "pythonw.exe")

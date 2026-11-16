@@ -499,7 +499,7 @@ def start_selftest(dev: str) -> tuple[bool, str]:
     if IS_WIN:
         code, out = run([exe, "-t", "short", dev], timeout=60)
     else:
-        code, out = run_root(f"{exe} -t short {dev}", timeout=60)
+        code, out = run_root([exe, "-t", "short", dev], timeout=60)
     if code & 0b11 or "has begun" not in out:
         return False, _tail(out)
     return True, "Autoteste iniciado — demora cerca de 2 minutos. Depois carregue em «Ler discos»."

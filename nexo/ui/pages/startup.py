@@ -86,6 +86,8 @@ class StartupPage(Page):
         ok, msg = startup.set_enabled(item, on)
         if ok:
             item.enabled = on
+            from ...core import changes
+            changes.mark("arranque", f"{'Ativou' if on else 'Desativou'} «{item.name}» no arranque")
         else:
             tg.setChecked(not on)
         notify(f"{item.name}: {'ativado' if on else 'desativado'} — {msg}" if ok else f"{item.name}: {msg}",

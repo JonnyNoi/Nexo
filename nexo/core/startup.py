@@ -208,7 +208,8 @@ _SELF_NAME = "Nexo"
 def _self_command() -> str:
     import sys
     if getattr(sys, "frozen", False):
-        return f'"{sys.executable}" --minimized'
+        from .util import self_executable
+        return f'"{self_executable()}" --minimized'
     root = Path(__file__).resolve().parents[2]
     return f'"{sys.executable}" "{root / "run_nexo.py"}" --minimized'
 

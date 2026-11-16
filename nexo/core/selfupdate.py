@@ -38,6 +38,14 @@ def configured() -> bool:
     return bool(re.fullmatch(r"[\w.-]+/[\w.-]+", UPDATE_REPO or ""))
 
 
+def asset_name() -> str:
+    """Nome do ficheiro da release que serve a esta instalação."""
+    from .util import is_appimage
+    if IS_WIN:
+        return "Nexo.exe"
+    return "Nexo-x86_64.AppImage" if is_appimage() else "Nexo"
+
+
 def frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
@@ -58,7 +66,7 @@ def _get(url: str, timeout: float = 15):
 
 def parse_release(data: dict) -> Release:
     tag = str(data.get("tag_name") or "").lstrip("vV")
-    want = "Nexo.exe" if IS_WIN else "Nexo"
+    want = asset_name()
     rel = Release(tag, (data.get("body") or "").strip(), data.get("html_url") or "")
     for a in data.get("assets") or []:
         if a.get("name") == want:
@@ -85,12 +93,13 @@ def install(rel: Release, progress=None) -> Path:
     if not frozen():
         raise RuntimeError("A atualização automática só funciona no executável do Nexo (não a partir do código).")
     if not rel.asset_url:
-        raise RuntimeError(f"A versão {rel.version} não tem o ficheiro {'Nexo.exe' if IS_WIN else 'Nexo'} para "
+        raise RuntimeError(f"A versão {rel.version} não tem o ficheiro {asset_name()} para "
                            "este sistema. Transfira-a manualmente da página da versão.")
     if not rel.sha256:
         raise RuntimeError("A versão nova não tem soma de verificação (SHA-256) publicada — por segurança, "
                            "não é instalada automaticamente.")
-    exe = Path(sys.executable).resolve()
+    from .util import self_executable
+    exe = Path(self_executable()).resolve()
     new = exe.with_name(exe.name + ".novo")
     h = hashlib.sha256()
     got = 0

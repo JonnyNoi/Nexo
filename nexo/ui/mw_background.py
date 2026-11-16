@@ -3,6 +3,7 @@ atualizações do sistema e do Nexo e troca automática do fundo do ambiente de 
 from __future__ import annotations
 
 import os
+import time
 
 from PySide6.QtCore import QTimer
 
@@ -46,6 +47,69 @@ class BackgroundMixin:
         self._su_timer.timeout.connect(self._self_update_check)
         self._su_timer.start(3 * 3600_000)
         QTimer.singleShot(120_000, self._self_update_check)
+        # fiabilidade (desligares sem aviso, falhas, erros de hardware): 1 min depois do arranque e a cada 6 h
+        self._rel_busy = False
+        self._rel_timer = QTimer(self)
+        self._rel_timer.timeout.connect(self._reliability_check)
+        self._rel_timer.start(6 * 3600_000)
+        QTimer.singleShot(60_000, self._reliability_check)
+        # throttling (CPU/GPU a baixar o clock por temperatura)
+        from ..core import throttle
+        self.throttle = throttle.Detector(*throttle.limits())
+        self._thr_tick = 0
+        self._thr_alerted: dict[str, float] = {}
+        self.hub.updated.connect(self._throttle_tick)
+
+    # ------------------------------------------------------------------ fiabilidade e throttling
+    def _reliability_check(self):
+        if self._rel_busy or getattr(self, "game", None) is not None:
+            return
+        self._rel_busy = True
+        from ..core import reliability as rel
+
+        def done(data):
+            self._rel_busy = False
+            evs = rel.events(data)
+            seen = float(get_setting("rel_seen") or 0)
+            newest = max((e.when for e in evs), default=0.0)
+            if not seen:   # primeira vez: o histórico antigo não gera avisos
+                set_setting("rel_seen", max(newest, 1.0))
+                return
+            new = rel.new_since(evs, seen)
+            if newest > seen:
+                set_setting("rel_seen", newest)
+            if not new or not get_setting("alert_reliability"):
+                return
+            serious = [e for e in new if e.kind == "bad"]
+            e = (serious or new)[0]
+            more = f" (+{len(new) - 1} outros eventos)" if len(new) > 1 else ""
+            self._alert(f"{rel.CATEGORIES[e.cat][0]}: {e.title} — {time.strftime('%d/%m %H:%M', time.localtime(e.when))}"
+                        f"{more}. Veja o que fazer em Fiabilidade.", "bad" if serious else "warn", "Fiabilidade")
+
+        def fail(_m):
+            self._rel_busy = False
+        run_async(rel.scan, on_done=done, on_fail=fail)
+
+    def _throttle_tick(self, readings):
+        from ..core import throttle
+        self._thr_tick += 1
+        counter = throttle.intel_counter() if self._thr_tick % 5 == 0 else None
+        game = getattr(self, "game", None)
+        for what, ep in self.throttle.feed(throttle.sample_from(readings), counter=counter,
+                                           game=game.name if game is not None else None):
+            if what == "end":
+                run_async(throttle.log_episode, ep, on_fail=lambda _m: None)
+                st = getattr(self, "game_stats", None)
+                if game is not None and st is not None:
+                    st.setdefault("throttle", {}).setdefault(ep.comp, 0.0)
+                    st["throttle"][ep.comp] += ep.seconds
+                continue
+            now = time.monotonic()
+            if get_setting("alert_throttle") and now - self._thr_alerted.get(ep.comp, -1e9) > 600:
+                self._thr_alerted[ep.comp] = now
+                temp = f" ({ep.peak_temp:.0f} °C)" if ep.peak_temp is not None else ""
+                self._alert(f"{throttle.WHO[ep.comp]} está a baixar o clock por temperatura{temp} — o desempenho "
+                            f"desce. {throttle.ADVICE[ep.comp]}", "warn", "Fiabilidade")
 
     # ------------------------------------------------------------------ vigilância
     def _run_scheduled(self):

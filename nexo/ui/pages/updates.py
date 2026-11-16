@@ -232,6 +232,9 @@ class UpdatesPage(Page):
         def done(res):
             self.btn_all.setText("Atualizar tudo")
             ok, msg = res
+            if ok:
+                from ...core import changes
+                changes.mark("atualizacao", "Atualizou " + ", ".join(w.split(" (")[0] for w in what))
             notify(("Atualizações instaladas. " if ok else "Atualização com problemas: ") + msg, "ok" if ok else "bad")
             self.check()
 

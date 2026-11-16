@@ -1,4 +1,4 @@
-"""Modo jogo na janela principal: deteção do jogo, overlay, ventoinhas e sessões de jogo."""
+"""Modo jogo na janela principal: deteção do jogo, overlay, perfis por jogo e sessões de jogo."""
 from __future__ import annotations
 
 from PySide6.QtCore import QTimer
@@ -24,11 +24,6 @@ class GameMixin:
         # perfil do jogo atual (energia, programas fechados, GameMode) — para desfazer no fim
         self._gp_power_prev: str | None = None
         self._gp_gamemode_pid = 0
-        # ------------------------------------------------------------- ventoinhas
-        # o gestor das ventoinhas só nasce se houver um perfil ativo (ou quando a página abre)
-        if get_setting("fan_profile", "auto") != "auto":
-            from .hwcontrol import fan_manager
-            fan_manager(self.hub)
 
     # ------------------------------------------------------------------ modo jogo
     def _check_game(self):
@@ -63,11 +58,6 @@ class GameMixin:
             self._profile_stop()
         self.game = g
         self.overlay.fps.set_game(g)
-        from .hwcontrol import existing_fan_manager, fan_manager, game_profile
-        from ..core.fans import PROFILES
-        fan_prof = game_profile(g.name) if g is not None else ""
-        if fan_prof or existing_fan_manager() is not None:
-            fan_manager(self.hub).set_game(g.name if g is not None else None)
         if g is not None:
             from ..core import gameprofile
             self.game_stats = {"cpu_max": None, "gpu_max": None, "start": g.started, "fps": []}
@@ -75,8 +65,6 @@ class GameMixin:
             if get_setting("game_notify"):
                 if gameprofile.overlay_for(g.name, get_setting("overlay_auto")):
                     extra.append("overlay ligado")
-                if fan_prof:
-                    extra.append(f"ventoinhas em «{PROFILES[fan_prof]['name']}»")
                 self._alert(f"🎮 Jogo detetado: {g.name}" + (" — " + ", ".join(extra) if extra else ""), "info",
                             "Modo jogo")
             if gameprofile.overlay_for(g.name, get_setting("overlay_auto")) or self.overlay_manual:
@@ -95,6 +83,11 @@ class GameMixin:
                 parts.append(f"CPU máx. {self.game_stats['cpu_max']:.0f} °C")
             if self.game_stats.get("gpu_max") is not None:
                 parts.append(f"GPU máx. {self.game_stats['gpu_max']:.0f} °C")
+            for comp, secs in (self.game_stats.get("throttle") or {}).items():
+                if secs >= 5:
+                    who = {"cpu": "CPU limitada", "gpu": "GPU limitada"}[comp]
+                    parts.append(f"{who} pela temperatura {secs / 60:.0f} min" if secs >= 60
+                                 else f"{who} pela temperatura {secs:.0f} s")
             if self.game_stats.get("fps_n", 0) >= 10:
                 parts.append(f"{self.game_stats['fps_sum'] / self.game_stats['fps_n']:.0f} FPS em média "
                              f"(mín. {self.game_stats['fps_min']:.0f})")
@@ -165,9 +158,9 @@ class GameMixin:
     # ------------------------------------------------------------------ perfil por jogo
     def _profile_start(self, g) -> list[str]:
         """Aplica o perfil do jogo. Devolve o que mudou (para a notificação)."""
-        from ..core import fans as fc
         from ..core import gameprofile
-        from ..core.fans import POWER_NAMES
+        from ..core import power as fc
+        from ..core.power import POWER_NAMES
         from .widgets import run_async
         prof = gameprofile.get(g.name)
         extra = []
@@ -209,8 +202,8 @@ class GameMixin:
 
     def _profile_stop(self, wait: bool = False):
         """O jogo fechou: repõe a energia e desliga o GameMode."""
-        from ..core import fans as fc
         from ..core import gameprofile
+        from ..core import power as fc
         from .widgets import run_async
         prev, self._gp_power_prev = self._gp_power_prev, None
         if prev is not None:
@@ -233,7 +226,3 @@ class GameMixin:
             self._profile_stop(wait=True)
         self.overlay.hide()
         self.overlay.fps.stop()
-        from .hwcontrol import existing_fan_manager
-        fans = existing_fan_manager()
-        if fans is not None:
-            fans.shutdown()   # ventoinhas para o hardware; energia como estava antes do jogo

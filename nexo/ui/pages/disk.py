@@ -892,6 +892,9 @@ class DiskPage(Page):
             self.btn_clean.setEnabled(True)
             bad = [r for r in res if not r[1]]
             freed = sum(r[3] for r in res)
+            if len(res) > len(bad):
+                from ...core import changes
+                changes.mark("limpeza", f"Limpeza: {', '.join(r[0] for r in res if r[1])}")
             notify(f"Limpeza concluída: {len(res) - len(bad)} categorias"
                    + (f" · libertados {human_bytes(freed)}" if freed else "")
                    + (f" · falharam: {', '.join(r[0] for r in bad)}" if bad else ""), "warn" if bad else "ok")

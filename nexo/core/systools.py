@@ -289,14 +289,14 @@ def linux_orphans() -> tuple[bool, str]:
 
 
 def linux_trim() -> tuple[bool, str]:
-    return _out_ok(*run_root("fstrim -av", timeout=1800), "TRIM concluído")
+    return _out_ok(*run_root(["fstrim", "-av"], timeout=1800), "TRIM concluído")
 
 
 def linux_flush_dns() -> tuple[bool, str]:
     if which("resolvectl"):
         code, out = run(["resolvectl", "flush-caches"], timeout=20)
         if code != 0:
-            code, out = run_root("resolvectl flush-caches", timeout=60)
+            code, out = run_root(["resolvectl", "flush-caches"], timeout=60)
         return code == 0, "Cache de DNS limpa" if code == 0 else out
     return False, "O systemd-resolved não está em uso (não há cache de DNS a limpar)."
 

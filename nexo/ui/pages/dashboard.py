@@ -42,6 +42,9 @@ class DashboardPage(Page):
         sc.addLayout(right, 1)
         self.score_card.add(sc)
         self.add(self.score_card)
+        from ..slowdiag_card import SlowDiagCard
+        self.slow_card = SlowDiagCard(hub)
+        self.add(self.slow_card)
         self._slow: list = []
         self._slow_at = 0.0
 

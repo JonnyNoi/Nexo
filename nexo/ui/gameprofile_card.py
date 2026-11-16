@@ -1,12 +1,11 @@
-"""Cartão "Perfis por jogo" (página Modo jogo): ventoinhas, energia, overlay, programas a fechar e GameMode."""
+"""Cartão "Perfis por jogo" (página Modo jogo): energia, overlay, programas a fechar e GameMode."""
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QListWidget, QListWidgetItem, QPushButton
 
-from ..core import fans as fc
 from ..core import gameprofile as gp
-from ..core.util import IS_LINUX, get_setting
+from ..core.util import IS_LINUX
 from .widgets import Card, SettingRow, Toggle, hbox, label, notify, run_async, separator
 
 
@@ -25,13 +24,6 @@ class GameProfileCard(Card):
         self.b_now.clicked.connect(self._use_current)
         self.add(hbox(label("<b>Jogo</b>"), self.game_cb, self.b_now, None))
         self.add(separator())
-
-        self.fan_cb = QComboBox()
-        self.fan_cb.addItem("Usar o geral (página Ventoinhas)", "")
-        for k in fc.GAME_PROFILES:
-            self.fan_cb.addItem(fc.PROFILES[k]["name"], k)
-        self.fan_cb.currentIndexChanged.connect(lambda _i: self._save_fans())
-        self.add(SettingRow("Ventoinhas", "Perfil enquanto este jogo está aberto.", self.fan_cb))
 
         self.power_cb = QComboBox()
         for k, v in gp.POWER_CHOICES.items():
@@ -99,7 +91,7 @@ class GameProfileCard(Card):
         return self.game_cb.currentText().strip()
 
     def _set_enabled(self, on: bool):
-        for w in (self.fan_cb, self.ov_cb, self.close_list, self.b_reset):
+        for w in (self.ov_cb, self.close_list, self.b_reset):
             w.setEnabled(on)
         self.power_cb.setEnabled(on and gp.power_available())
         if self.gm is not None:
@@ -114,8 +106,6 @@ class GameProfileCard(Card):
         self._set_enabled(bool(game))
         self._loading = True
         prof = gp.get(game)
-        per_game = (get_setting("fan_game_profiles") or {}).get(game, "")
-        self.fan_cb.setCurrentIndex(max(0, self.fan_cb.findData(per_game)))
         self.power_cb.setCurrentIndex(max(0, self.power_cb.findData(prof["power"])))
         self.ov_cb.setCurrentIndex(max(0, self.ov_cb.findData(prof["overlay"])))
         if self.gm is not None:
@@ -158,16 +148,6 @@ class GameProfileCard(Card):
         gp.set_value(game, key, value)
         self._applied_now(game)
 
-    def _save_fans(self):
-        from .hwcontrol import existing_fan_manager, set_game_profile
-        game = self._game()
-        if self._loading or not game:
-            return
-        set_game_profile(self.fan_cb.currentData() or "", game)
-        m = existing_fan_manager()
-        if m is not None:
-            m.refresh_game()
-
     def _save_close(self):
         if self._loading:
             return
@@ -176,13 +156,11 @@ class GameProfileCard(Card):
         self._save("close", names)
 
     def _reset(self):
-        from .hwcontrol import set_game_profile
         game = self._game()
         if not game:
             return
         for k, v in gp.DEFAULT.items():
             gp.set_value(game, k, v)
-        set_game_profile("", game)
         self._game_selected()
         notify(f"Perfil de «{game}» apagado — usa as definições gerais.", "ok")
 

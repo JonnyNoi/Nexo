@@ -50,7 +50,7 @@ class Profiles(TempConfig):
 
     def test_known_games(self):
         gp.set_value("B", "gamemode", True)
-        util.set_setting("fan_game_profiles", {"A": "performance"})
+        gp.set_value("A", "overlay", "on")
         self.assertEqual(gp.known_games()[:2], ["A", "B"])
 
 

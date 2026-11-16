@@ -95,7 +95,8 @@ def restart_command() -> tuple[str, list[str]]:
     import os
     extra = ["--wait-pid", str(os.getpid())]
     if getattr(sys, "frozen", False):
-        return sys.executable, extra
+        from .core.util import self_executable
+        return self_executable(), extra
     return sys.executable, ["-m", "nexo", *extra]
 
 

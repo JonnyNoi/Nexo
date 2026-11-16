@@ -134,6 +134,9 @@ class DebloatPage(Page):
             snap, res = out
             self.btn_remove.setEnabled(True)
             bad = [r for r in res if not r[1]]
+            if len(res) > len(bad):
+                from ...core import changes
+                changes.mark("debloat", f"Removeu {len(res) - len(bad)} apps do Windows")
             snap_bad = bool(snap and not snap[0])
             notify(f"{len(res) - len(bad)} apps removidas" + (f", {len(bad)} falharam: " +
                                                               ", ".join(r[0] for r in bad) if bad else "")

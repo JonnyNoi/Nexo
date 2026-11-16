@@ -3,7 +3,7 @@
 Apanha erros de importação, de construção das páginas e de on_show()/on_hide() antes de chegarem ao
 executável. Nada é escrito no hardware nem nas definições reais:
 - Task.start não lança threads (as páginas ficam no estado "a carregar");
-- escritas nas ventoinhas, run_root e pkexec estão bloqueadas;
+- mudanças de energia, run_root e pkexec estão bloqueadas;
 - XDG_CONFIG_HOME/APPDATA apontam para uma pasta temporária.
 
 Executar:  .venv/bin/python -m unittest discover -s tests -t .
@@ -38,7 +38,7 @@ class UiSmoke(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
         cls.patches = [mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": cls.tmp.name, "APPDATA": cls.tmp.name})]
-        from nexo.core import fans, util
+        from nexo.core import power, util
         from nexo.ui import netmonitor, widgets
         cls.patches += [
             mock.patch.object(util, "_settings", None),
@@ -46,9 +46,7 @@ class UiSmoke(unittest.TestCase):
             mock.patch.object(widgets.SensorHub, "_loop", lambda self: None),
             mock.patch.object(netmonitor.NetMonitor, "start", lambda *a, **k: None),
             mock.patch.object(util, "run_root", _blocked),
-            mock.patch.object(fans, "set_pct", _blocked),
-            mock.patch.object(fans, "set_auto", _blocked),
-            mock.patch.object(fans, "set_power_profile", _blocked),
+            mock.patch.object(power, "set_power_profile", _blocked),
         ]
         for p in cls.patches:
             p.start()

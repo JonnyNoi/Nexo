@@ -96,6 +96,23 @@ def system_summary() -> str:
             f"Python {platform.python_version()}" + (" · executável" if getattr(sys, "frozen", False) else ""))
 
 
+def diagnostic_report(n: int = 150) -> str:
+    """Texto para colar num relatório de problema: versão, sistema, últimas linhas do registo e da
+    última falha grave. Os caminhos da pasta pessoal ficam como ~ (não expõe o nome de utilizador)."""
+    import os
+    parts = [system_summary(), "", f"--- últimas {n} linhas do registo ---", tail(n) or "(registo vazio)"]
+    crash = log_path().with_name(log_path().stem + "-crash.log")
+    try:
+        c = crash.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        c = ""
+    if c:
+        parts += ["", "--- última falha grave ---", "\n".join(c.splitlines()[-60:])]
+    text = "\n".join(parts)
+    home = os.path.expanduser("~")
+    return text.replace(home, "~") if len(home) > 1 else text
+
+
 def tail(n: int = 200) -> str:
     try:
         lines = log_path().read_text(encoding="utf-8", errors="replace").splitlines()

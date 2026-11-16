@@ -48,7 +48,7 @@ class Catalogue(unittest.TestCase):
 
     def test_menu_is_translated(self):
         names = ["Visão geral", "Informação", "Sensores", "Discos", "Saúde dos discos", "Espaço em disco",
-                 "Processos", "Antivírus", "Otimização", "Arranque", "Modo jogo", "Ventoinhas", "Testes",
+                 "Processos", "Fiabilidade", "Antivírus", "Otimização", "Arranque", "Modo jogo", "Testes",
                  "Benchmark", "Stress test", "Software", "Atualizações", "Instalar aplicações", "Internet",
                  "Utilitários", "Tarefas agendadas", "Fundo de ecrã", "Definições", "SISTEMA", "DESEMPENHO",
                  "FERRAMENTAS"]

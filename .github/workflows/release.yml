@@ -1,7 +1,7 @@
 name: Versão
 
 # Ao publicar uma etiqueta "vX.Y" (ex.: git tag -a v2.2 -m "…" && git push --tags):
-#   testes → executável Linux + Nexo.exe + instalador do Windows → release no GitHub com SHA256SUMS.
+#   testes → executável Linux + AppImage + Nexo.exe + instalador do Windows → release no GitHub com SHA256SUMS.
 # O Nexo instalado procura estas releases (UPDATE_REPO em nexo/core/util.py) e confirma o SHA-256
 # que o GitHub publica para cada ficheiro antes de se atualizar.
 #
@@ -42,10 +42,17 @@ jobs:
           python -m pip install -r requirements.txt pyinstaller
           pyinstaller --noconfirm --clean --onefile --windowed --name Nexo \
               --distpath dist --workpath build/linux --specpath build/linux run_nexo.py
+      - name: AppImage
+        run: |
+          sudo apt-get install -y file
+          PYTHON=python ./packaging/appimage/build_appimage.sh
+          cp Aplicacao/Linux/Nexo-x86_64.AppImage dist/
       - uses: actions/upload-artifact@v4
         with:
           name: linux
-          path: dist/Nexo
+          path: |
+            dist/Nexo
+            dist/Nexo-x86_64.AppImage
 
   windows:
     needs: testes
@@ -100,7 +107,9 @@ jobs:
           path: out
           merge-multiple: true
       - name: SHA256SUMS
-        run: cd out && chmod +x Nexo && sha256sum Nexo Nexo.exe Nexo-Instalador-*.exe | tee SHA256SUMS
+        run: |
+          cd out && chmod +x Nexo Nexo-x86_64.AppImage
+          sha256sum Nexo Nexo-x86_64.AppImage Nexo.exe Nexo-Instalador-*.exe | tee SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
           files: out/*

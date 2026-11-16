@@ -107,7 +107,7 @@ _SYSTEM = {
     "xdg-desktop-portal-gnome", "baloo_file", "baloo_file_extractor", "drkonqi-coredump-launcher", "kscreen_backend_launcher",
     "kdeconnect-indicator", "plasma-browser-integration-host", "evolution-source-registry", "evolution-alarm-notify",
     "tracker-miner-fs-3", "gvfsd", "gvfsd-fuse", "gvfsd-metadata", "gvfs-udisks2-volume-monitor", "systemd-inhibit",
-    "bwrap", "xdg-dbus-proxy", "portal", "kio-worker", "kiod6", "kiod5", "ksystemstats", "kactivitymanagerd",
+    "bwrap", "xdg-dbus-proxy", "portal", "kio-worker", "kiod6", "kiod5", "ksystemstats",
     "geoclue", "mission-control-5", "kf6.kio.core.kioworker", "wl-paste", "wl-copy", "ksplashqml",
     # Windows
     "explorer", "dwm", "csrss", "winlogon", "wininit", "services", "lsass", "svchost", "smss", "fontdrvhost",

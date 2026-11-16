@@ -90,9 +90,9 @@ def _page_factories(hub, on_settings):
         from .pages.internet import InternetPage
         return InternetPage()
 
-    def fans():
-        from .pages.fans import FansPage
-        return FansPage(hub)
+    def reliability():
+        from .pages.reliability import ReliabilityPage
+        return ReliabilityPage()
 
     def diskhealth():
         from .pages.diskhealth import DiskHealthPage
@@ -117,10 +117,10 @@ def _page_factories(hub, on_settings):
                      ("Discos", "hdd", [("Saúde dos discos", "hdd", diskhealth),
                                         ("Espaço em disco", "disk", disk)]),
                      ("Processos", "list", processes),
+                     ("Fiabilidade", "chart", reliability),
                      ("Antivírus", "virus", antivirus)]),
         ("DESEMPENHO", [("Otimização", "zap", opt),
                         ("Modo jogo", "gamepad", gamemode),
-                        ("Ventoinhas", "fan", fans),
                         ("Testes", "gauge", [("Benchmark", "gauge", benchmark),
                                              ("Stress test", "flame", stress)])]),
         ("FERRAMENTAS", [("Software", "upgrade", [("Atualizações", "upgrade", updates),

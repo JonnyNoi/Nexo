@@ -160,7 +160,7 @@ def update_signatures() -> tuple[bool, str]:
         return code == 0, "Assinaturas atualizadas." if code == 0 else _tail(out)
     if not which("freshclam"):
         return False, "O freshclam não está instalado (vem com o ClamAV)."
-    code, out = run_root("freshclam", timeout=900)
+    code, out = run_root(["freshclam"], timeout=900)
     if code == 0:
         return True, "Assinaturas do ClamAV atualizadas."
     if "locked by another process" in out or "lock" in out.lower():
@@ -960,7 +960,7 @@ def kill_process(pid: int) -> tuple[bool, str]:
         return True, "O processo já tinha terminado."
     except psutil.AccessDenied:
         if not IS_WIN:
-            code, out = run_root(f"kill -9 {int(pid)}", timeout=60)
+            code, out = run_root(["kill", "-9", str(int(pid))], timeout=60)
             return code == 0, "Processo terminado." if code == 0 else _tail(out)
         return False, "Sem permissão — execute o Nexo como administrador."
 
@@ -1104,7 +1104,7 @@ def quarantine_restore(qid: str) -> tuple[bool, str]:
         if IS_WIN:
             plain.unlink(missing_ok=True)
             return False, "Sem permissão — execute o Nexo como administrador."
-        code, out = run_root(f"install -m {mode:o} -- {shlex.quote(str(plain))} {shlex.quote(orig)}", timeout=120)
+        code, out = run_root(["install", "-m", f"{mode:o}", "--", str(plain), orig], timeout=120)
         if code != 0:
             plain.unlink(missing_ok=True)
             return False, _tail(out)

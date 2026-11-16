@@ -44,6 +44,15 @@ class SettingsPage(Page):
         al.add(SettingRow("Saúde dos discos a piorar",
                           "Avisa quando o S.M.A.R.T. de um disco passa de 'bom' para 'atenção' ou 'mau' "
                           "(usa a última leitura da página Saúde dos discos).", self.tg_smart))
+        al.add(separator())
+        al.add(SettingRow("Limitação por temperatura",
+                          "Avisa quando o processador ou a placa gráfica baixam o clock por estarem demasiado quentes.",
+                          self._toggle("alert_throttle")))
+        al.add(separator())
+        al.add(SettingRow("Problemas de estabilidade",
+                          "Avisa de desligares sem aviso, falhas do sistema, erros de hardware e do controlador "
+                          "gráfico (verificado no arranque e a cada 6 horas — página Fiabilidade).",
+                          self._toggle("alert_reliability")))
         self.add(al)
 
         # ---------------------------------------------------------------- proteção
@@ -96,8 +105,11 @@ class SettingsPage(Page):
         btn_log = QPushButton("Abrir registo de erros")
         btn_log.setToolTip("nexo.log: erros e avisos do Nexo (útil para reportar um problema)")
         btn_log.clicked.connect(self._open_log)
+        btn_diag = QPushButton("Copiar diagnóstico")
+        btn_diag.setToolTip("Copia a versão, o sistema e as últimas linhas do registo — cole no relatório do problema")
+        btn_diag.clicked.connect(self._copy_diag)
         about.add(hbox(label(f"{APP_NAME} {APP_VERSION} · dados em {config_dir()}", "Muted", wrap=True), None,
-                       btn_log, btn_dir))
+                       btn_diag, btn_log, btn_dir))
         b_wiz = QPushButton("Assistente de boas-vindas")
         b_wiz.setToolTip("Voltar a ver o assistente da primeira execução")
         b_wiz.clicked.connect(lambda: self.window().show_wizard())
@@ -149,7 +161,7 @@ class SettingsPage(Page):
 
     # ------------------------------------------------------------------ cópia das definições
     def _build_backup(self):
-        c = Card("Cópia das definições", "Guarde as suas definições (perfis das ventoinhas, overlay, alertas, jogos "
+        c = Card("Cópia das definições", "Guarde as suas definições (overlay, perfis por jogo, alertas, jogos "
                  "marcados…), o histórico dos benchmarks e das sessões de jogo num ficheiro — para levar para outro "
                  "PC ou repor depois de reinstalar.", icon="box")
         b_exp = QPushButton("Exportar…")
@@ -419,6 +431,12 @@ class SettingsPage(Page):
             notify("Ainda não há registo de erros.", "info")
             return
         open_path(p)
+
+    def _copy_diag(self):
+        from PySide6.QtGui import QGuiApplication
+        from ...core import log as nlog
+        QGuiApplication.clipboard().setText(nlog.diagnostic_report())
+        notify("Diagnóstico copiado — cole-o no relatório do problema.", "ok")
 
     def _autostart(self, on):
         ok, msg = startup.set_self_autostart(bool(on))

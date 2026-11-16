@@ -65,6 +65,9 @@ class TweakList(Card):
             # Windows; no Linux o snapshot vai junto do próprio comando root (um só pedido de palavra-passe)
             snap = snapshot.before(f"ajuste: {t.name}") if on else None
             ok, msg = t.set(on)
+            if ok:
+                from ...core import changes
+                changes.mark("ajuste", f"{'Ligou' if on else 'Desligou'} o ajuste «{t.name}»")
             if snap and not snap[0]:
                 msg += " (aviso: não foi possível criar o ponto de restauro)"
             return ok, msg
@@ -75,6 +78,9 @@ class TweakList(Card):
             return
 
         def done(msgs):
+            if msgs:
+                from ...core import changes
+                changes.mark("ajuste", "Repôs os valores originais dos ajustes")
             notify("; ".join(msgs) if msgs else "Nada para restaurar", "ok")
             self.refresh()
         run_async(tweaks.restore_all, self.items, on_done=done)

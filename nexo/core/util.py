@@ -15,7 +15,7 @@ IS_LINUX = sys.platform.startswith("linux")
 
 APP_NAME = "Nexo"
 LEGACY_NAME = "PCForge"  # nome antigo (para migrar definições)
-APP_VERSION = "2.2"
+APP_VERSION = "2.3"
 # repositório GitHub ("dono/nome") de onde o Nexo procura versões novas (releases com os ficheiros
 # "Nexo" e "Nexo.exe"). Vazio = sem verificação de atualizações do próprio Nexo.
 UPDATE_REPO = ""
@@ -114,6 +114,9 @@ DEFAULT_SETTINGS = {
     "alert_disk": True,      # avisar quando um disco fica com pouco espaço livre
     "alert_disk_pct": 10,    # % livre mínima
     "alert_smart": True,     # avisar quando a saúde de um disco (S.M.A.R.T.) piora
+    "alert_throttle": True,  # avisar quando a CPU/GPU baixa o clock por temperatura
+    "alert_reliability": True,  # avisar de desligares sem aviso, falhas do sistema e erros de hardware
+    "rel_seen": 0,           # hora do último evento de fiabilidade já avisado
     "history": True,         # guardar o histórico dos sensores (média por minuto, 7 dias)
     "snapshot_before": True,  # criar ponto de restauro antes de alterar o sistema
     "snapshot_last": 0,
@@ -249,6 +252,18 @@ def is_admin() -> bool:
     return os.geteuid() == 0
 
 
+def is_appimage() -> bool:
+    ai = os.environ.get("APPIMAGE")
+    return bool(ai and getattr(sys, "frozen", False) and os.path.isfile(ai))
+
+
+def self_executable() -> str:
+    """Executável do Nexo que continua a existir depois de este processo sair. Na AppImage é o próprio
+    ficheiro .AppImage: sys.executable aponta para a montagem temporária, que desaparece quando o Nexo fecha
+    (não serve para o arranque automático, reiniciar nem para a atualização)."""
+    return os.environ["APPIMAGE"] if is_appimage() else sys.executable
+
+
 def relaunch_as_admin() -> bool:
     """Windows: reabre o programa a pedir elevação (UAC). Devolve True se lançou."""
     if not IS_WIN:
@@ -263,20 +278,30 @@ def relaunch_as_admin() -> bool:
     return rc > 32
 
 
-def run_root(shell_cmd: str, timeout: float = 300) -> tuple[int, str]:
-    """Linux: executa um comando de shell como root (pkexec mostra o pedido de palavra-passe).
-    Windows: executa no shell normal (as ações que precisam de admin verificam is_admin antes)."""
-    if IS_WIN:
-        return run(shell_cmd, timeout=timeout, shell=True)
+def run_root(cmd: str | list[str], timeout: float = 300) -> tuple[int, str]:
+    """Executa um comando como root. Linux: pkexec mostra o pedido de palavra-passe.
+    Windows: executa normalmente (as ações que precisam de admin verificam is_admin antes).
+
+    Preferir uma lista de argumentos — vai diretamente ao programa, sem shell, e nenhum caminho com
+    espaços, plicas ou $ pode ser mal interpretado. Uma string só para o que precisa mesmo do shell
+    (&&, redirecionamentos, $(…)), sempre com shlex.quote em cada valor variável."""
+    if isinstance(cmd, str):
+        if IS_WIN:
+            return run(cmd, timeout=timeout, shell=True)
+        argv = ["sh", "-c", cmd]
+    else:
+        if not cmd:
+            return 1, "comando vazio"
+        argv = list(cmd)
+        if IS_WIN:
+            return run(argv, timeout=timeout)
     if os.geteuid() == 0:
-        return run(["sh", "-c", shell_cmd], timeout=timeout)
+        return run(argv, timeout=timeout)
     if which("pkexec"):
-        return run(["pkexec", "sh", "-c", shell_cmd], timeout=timeout)
+        # o pkexec limpa o PATH: dar-lhe o caminho absoluto do programa
+        exe = argv[0] if os.path.isabs(argv[0]) else (which(argv[0]) or argv[0])
+        return run(["pkexec", exe, *argv[1:]], timeout=timeout)
     return 126, "pkexec não está instalado; execute o Nexo como root para esta ação."
-
-
-def _sh_quote(s: str) -> str:
-    return "'" + s.replace("'", "'\\''") + "'"
 
 
 def _refuse_delete(path: str) -> bool:
@@ -332,7 +357,7 @@ def delete_as_admin(paths: list[str]) -> tuple[list[str], str]:
             _win_force_delete(p)
         out = ""
     else:
-        code, out = run_root("rm -rf -- " + " ".join(_sh_quote(p) for p in paths), timeout=900)
+        code, out = run_root(["rm", "-rf", "--", *paths], timeout=900)
         if code in (126, 127) and all(os.path.lexists(p) for p in paths):
             return [], out or "Pedido de palavra-passe cancelado."
     done = [p for p in paths if not os.path.lexists(p)]

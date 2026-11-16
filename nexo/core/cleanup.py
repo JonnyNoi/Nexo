@@ -100,10 +100,10 @@ def clean(cat: CleanCategory) -> tuple[bool, str]:
         code, out = run_root(cat.command, timeout=900) if cat.needs_admin else run(cat.command, timeout=900, shell=True)
         return code == 0, (out[-400:] if out else "Feito")
     if cat.needs_admin and IS_LINUX and os.geteuid() != 0:
-        quoted = " ".join("'" + t.replace("'", "'\\''") + "'" for t in cat.targets())
-        if not quoted:
+        targets = list(cat.targets())
+        if not targets:
             return True, "Nada para limpar"
-        code, out = run_root(f"rm -rf -- {quoted}")
+        code, out = run_root(["rm", "-rf", "--", *targets])
         return code == 0, out or "Feito"
     removed, failed = 0, 0
     cutoff = time.time() - cat.min_age_days * 86400

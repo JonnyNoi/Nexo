@@ -208,8 +208,8 @@ class CleanupSafety(TempConfig):
                 mock.patch.object(cleanup, "IS_LINUX", True), mock.patch("os.geteuid", return_value=1000):
             cleanup.clean(cat)
         cmd = rr.call_args[0][0]
-        self.assertTrue(cmd.startswith("rm -rf -- '"))
-        self.assertIn("'\\''", cmd)   # a plica do nome não fecha a citação
+        self.assertEqual(cmd[:3], ["rm", "-rf", "--"])   # lista de argumentos: sem shell, sem citações
+        self.assertTrue(all(c.startswith(str(d)) for c in cmd[3:]))
 
 
 # =========================================================================== arranque

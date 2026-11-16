@@ -20,7 +20,7 @@ from .util import APP_NAME, APP_VERSION, DEFAULT_SETTINGS, _save_lock, config_di
 
 # definições que pertencem a esta sessão/máquina e nunca viajam
 LOCAL_KEYS = {"geometry", "last_page_name", "snapshot_last", "wp_auto_last", "tray_hint_shown", "wallpaper",
-              "desktop_wp", "av_last_scan", "speed_history", "fan_power_saved"}
+              "desktop_wp", "av_last_scan", "speed_history", "rel_seen"}
 LOCAL_SUFFIXES = ("_last", "_at", "_time")
 MAX_BYTES = 20 * 1024 * 1024
 

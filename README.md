@@ -11,6 +11,7 @@ stress test, benchmark de CPU, otimização, **instalador de aplicações**, rep
 | Sistema | Ficheiro |
 |---|---|
 | **Linux** | `Aplicacao/Linux/Nexo` — abrir diretamente; `sh Aplicacao/Linux/instalar.sh` adiciona-o ao menu de aplicações |
+| **Linux (qualquer distribuição)** | `Nexo-x86_64.AppImage` (nas releases) — `chmod +x` e abrir; atualiza-se sozinha como o executável |
 | **Windows** | `Aplicacao/Windows/Nexo.exe` — ficheiro único, abre como administrador |
 
 ## Funcionalidades
@@ -21,17 +22,17 @@ Na primeira execução abre um **assistente de boas-vindas** (tema, avisos, pont
 
 | Página | O que faz |
 |---|---|
-| **Visão geral** | **Saúde do PC**: pontuação de 0 a 100 com as 3 ações mais úteis do momento (cada uma com botão para a página certa) — junta as verificações ao vivo com atualizações pendentes, drivers antigos, última análise antivírus e pontos de restauro. Resumo do hardware, gráfico CPU × GPU (temperatura / carga / consumo, 1–15 min), anéis de RAM / VRAM / disco, rede e disco ao vivo e **Saúde do sistema** (temperaturas, RAM, espaço, swap, tempo ligado, serviços com falha) com botão "Resolver". |
+| **Visão geral** | **Porque está lento?** — diagnóstico de um clique (mede 2 s): processador, memória e paginação, discos ocupados ou cheios, throttling, atualizações/antivírus/indexação a correr, perfil de energia e tempo ligado, cada conclusão com botão para a página que resolve. **Saúde do PC**: pontuação de 0 a 100 com as 3 ações mais úteis do momento (cada uma com botão para a página certa) — junta as verificações ao vivo com atualizações pendentes, drivers antigos, última análise antivírus e pontos de restauro. Resumo do hardware, gráfico CPU × GPU (temperatura / carga / consumo, 1–15 min), anéis de RAM / VRAM / disco, rede e disco ao vivo e **Saúde do sistema** (temperaturas, RAM, espaço, swap, tempo ligado, serviços com falha) com botão "Resolver". |
 | **Informação** | SO, CPU (caches, instruções), RAM (módulos no Windows / com root no Linux), GPU (VRAM, PCIe, VBIOS, OpenGL/Vulkan), placa-mãe/BIOS, Secure Boot, discos e rede. **Exportar relatório** em HTML ou JSON. |
 | **Sensores** | Todas as leituras com atual/mín./máx. (registados mesmo com a página fechada), filtros por tipo e pesquisa. **Gravar CSV** de todas as leituras 1×/s. Linux: hwmon (coretemp/k10temp, amdgpu, nvme, SPD…), RAPL, amdgpu sysfs. Windows: WMI + **LibreHardwareMonitor** (o Nexo transfere a versão oficial com SHA-256 verificado, abre-a escondida na bandeja e fecha-a à saída; todos os sensores dele aparecem). NVIDIA via `nvidia-smi` em ambos. |
 | **Saúde dos discos** | **Velocidade do disco** (leitura/escrita sequencial e aleatória 4K sem a cache da memória — O_DIRECT / FILE_FLAG_NO_BUFFERING). Dados **S.M.A.R.T.** de cada disco (NVMe, SSD SATA, HDD): veredicto **Bom / Atenção / Mau**, **vida restante** dos SSD, temperatura, horas ligado, dados escritos/lidos, desligamentos inesperados, setores realocados/pendentes, erros CRC (cabo) e todos os atributos. **Autoteste rápido** do disco. O resultado aparece também na Saúde do sistema. Linux: `smartctl` (o Nexo oferece-se para instalar o smartmontools; pede a palavra-passe uma vez por leitura). Windows: `smartctl` se existir, senão o que o Windows reporta (Get-PhysicalDisk). |
+| **Fiabilidade** | O que correu mal nos últimos 30 dias, com explicação e o que fazer: **desligares sem aviso** (Linux: arranques sem o registo normal de encerramento; Windows: Kernel-Power 41/6008), **falhas do sistema** (ecrã azul, kernel panic/oops/soft lockup), **erros de hardware** (WHEA/MCE), **controlador gráfico** (resets do amdgpu/i915, Xid da NVIDIA, Display 4101), **falta de memória** (OOM killer), **erros de disco** e **programas que fecharam com erro** (coredumpctl / Application Error). **Índice de estabilidade** 0–10 e faixa de 30 dias. Lê o journal / Visualizador de Eventos sem palavra-passe; avisa de eventos novos no arranque e a cada 6 h. **Throttling:** vigia a CPU e a GPU enquanto o Nexo está aberto (contadores do kernel nos Intel; nos outros, temperatura no limite + carga alta + clock abaixo do máximo atingido durante vários segundos) — avisa, regista e mostra no resumo da sessão de jogo. |
 | **Processos** | Gestor de tarefas leve: CPU/memória/threads por processo, ordenar, procurar, **Terminar** / **Forçar fim** (tecla Delete), prioridade, abrir a pasta do programa. Atualiza a cada 2 s só com a página aberta. |
 | **Antivírus** | Windows: Microsoft Defender. Linux: ClamAV (o Nexo instala-o) + heurísticas próprias. Análise rápida/completa, quarentena (ficheiros codificados e verificados por SHA-256; nunca apaga sozinho). |
 | **Otimização** | Ajustes de desempenho e — ao estilo do WinUtil — **ajustes do sistema e da interface** (plano Desempenho Máximo, hibernação, "Terminar tarefa" na barra, menu de contexto clássico, modo escuro, Teclas Presas, ecrã azul detalhado, preferir IPv4…). Linux: BBR, NMI watchdog, split-lock, inotify. Tudo reversível. Fechar programas em segundo plano. |
 | **Stress test** | CPU em todos os threads (FPU + inteiros) e/ou RAM (escreve e verifica 7 padrões). Pára no limite de temperatura, no fim do tempo ou ao detetar erro de memória. Gráfico e registo. |
-| **Benchmark** | **Placa gráfica:** cena 3D em OpenGL (ray marching com sombras, oclusão ambiente e reflexos) em 1080p/1440p/4K num processo à parte; nota = FPS × 10 (RX 6500 XT ≈ 1500 em 1080p). **CPU:** path tracer próprio (iluminação global, metal, vidro com refração) multi-core e single-core. Imagem determinística, nota = amostras/s ÷ 1000, histórico. Referência: i5-12400F ≈ 1290 multi / 196 single. |
-| **Modo jogo** | **Deteta o jogo que está a correr** (Steam/Proton com o nome verdadeiro, Wine, Lutris, Heroic, Epic, GOG, Xbox, pastas de jogos ou programas que marcar) e mostra um **overlay** por cima do jogo: temperatura e carga da CPU/GPU, consumo, RAM, VRAM, tempo de jogo e relógio — posição, formato (detalhado/compacto), opacidade e itens configuráveis; não apanha cliques. **Perfis por jogo:** ventoinhas, perfil de energia, overlay, programas a fechar quando o jogo arranca (pedido normal de fecho) e, no Linux, o **Feral GameMode** — tudo volta ao normal quando o jogo fecha. Ao fechar o jogo mostra o resumo da sessão e guarda-a no **histórico de sessões** (tempo jogado por jogo, FPS médio, 1 % low, mínimo e temperaturas máximas; 7/30 dias ou desde sempre). **Jogos instalados** de todas as lojas com tamanho, **Jogar** e **Pasta**. Funciona com jogos em janela/ecrã inteiro sem bordas. |
-| **Ventoinhas** | Perfis **Automático / Silencioso / Equilibrado / Desempenho / Máximo / Personalizado** com **curva arrastável** (temperatura → rotação), escolha da temperatura que cada ventoinha segue (CPU, GPU ou a mais quente), 100 % automático acima de 90 °C, nunca abaixo de 20 %, e devolução ao controlo do hardware quando o Nexo fecha. Opcional: mudar o perfil de energia junto e passar a «Desempenho» durante os jogos. Linux: canais PWM do kernel (placa gráfica AMD e, com o controlador nct6775/it87 — o Nexo ajuda a carregá-lo —, a motherboard); a permissão é pedida uma única vez. Windows: recomenda o FanControl. |
+| **Benchmark** | **Antes/depois:** cada resultado é comparado com o teste anterior igual (modo, qualidade e hardware) e lista o que mudou entretanto (ajustes, atualizações, arranque, limpezas, debloat — registados em `alteracoes.json`); abaixo de 3 % é variação normal. **Placa gráfica:** cena 3D em OpenGL (ray marching com sombras, oclusão ambiente e reflexos) em 1080p/1440p/4K num processo à parte; nota = FPS × 10 (RX 6500 XT ≈ 1500 em 1080p). **CPU:** path tracer próprio (iluminação global, metal, vidro com refração) multi-core e single-core. Imagem determinística, nota = amostras/s ÷ 1000, histórico. Referência: i5-12400F ≈ 1290 multi / 196 single. |
+| **Modo jogo** | **Deteta o jogo que está a correr** (Steam/Proton com o nome verdadeiro, Wine, Lutris, Heroic, Epic, GOG, Xbox, pastas de jogos ou programas que marcar) e mostra um **overlay** por cima do jogo: temperatura e carga da CPU/GPU, consumo, RAM, VRAM, tempo de jogo e relógio — posição, formato (detalhado/compacto), opacidade e itens configuráveis; não apanha cliques. **Perfis por jogo:** perfil de energia, overlay, programas a fechar quando o jogo arranca (pedido normal de fecho) e, no Linux, o **Feral GameMode** — tudo volta ao normal quando o jogo fecha. Ao fechar o jogo mostra o resumo da sessão e guarda-a no **histórico de sessões** (tempo jogado por jogo, FPS médio, 1 % low, mínimo e temperaturas máximas; 7/30 dias ou desde sempre). **Jogos instalados** de todas as lojas com tamanho, **Jogar** e **Pasta**. Funciona com jogos em janela/ecrã inteiro sem bordas. |
 | **Atualizações** | Mostra **o que há para atualizar** — pacotes do sistema (pacman via `checkupdates`, com plano B na base de dados local se os mirrors não responderem; apt, dnf, zypper), **AUR** (paru/yay), **Flatpak** e, no Windows, **winget** — com versão instalada e nova, filtro por origem e **Atualizar tudo** (ou **Abrir no terminal**, que inclui o AUR). Verifica sozinho a cada 6 h (só com internet) e mostra o número no menu lateral. **Drivers da placa gráfica:** versão do Mesa/NVIDIA (Linux, comparada com a última versão publicada e com as atualizações pendentes) ou do driver do fabricante (Windows, avisa se tiver mais de 6 meses). |
 | **Instalar aplicações** | ~60 aplicações populares por categoria (navegadores, jogos, multimédia, programação, utilitários, componentes). Marque e instale todas de uma vez, desinstale ou **atualize todas**. Windows: **winget**. Linux: **Flatpak/Flathub** (sem palavra-passe). |
 | **Utilitários** | Windows: **ponto de restauro**, SFC, DISM, chkdsk, repor rede, repor Windows Update, **funcionalidades** (WSL, Hyper-V, Sandbox, .NET 3.5), **Windows Update** "só segurança" e drivers, **painéis clássicos**. Linux: atualizar o sistema (pacman/apt/dnf/zypper), órfãos, TRIM, firmware (fwupd), serviços com falha, erros do arranque. Ambos: **DNS** (Cloudflare, Google, Quad9, AdGuard…) com **teste de velocidade**. |
@@ -85,14 +86,16 @@ no Windows use o botão **Admin** no menu (ou o `.exe` gerado, que já pede admi
   (usa o wine com um Python para Windows em `~/.local/share/nexo-wine`, preparado automaticamente na 1.ª vez);
   `--instalador` gera também `Nexo-Instalador-<versão>.exe` (Inno Setup: menu Iniciar, atalho, desinstalar)
 - **Pacote do Arch / CachyOS:** `sh packaging/arch/build.sh` (`--instalar` instala-o com o pacman)
+- **AppImage (qualquer distribuição):** `./packaging/appimage/build_appimage.sh` → `Aplicacao/Linux/Nexo-x86_64.AppImage`
+  (PyInstaller em modo pasta + appimagetool 1.9.1 e runtime oficiais com SHA-256 fixo; gerada também no release.yml)
 
 ### Versões (GitHub Releases) e atualizações automáticas
 
 Publicar uma etiqueta gera tudo no GitHub Actions (`.github/workflows/release.yml`): testes → `Nexo` (Linux,
-Ubuntu 22.04 para correr em mais distribuições) + `Nexo.exe` + instalador → release com `SHA256SUMS`.
+Ubuntu 22.04 para correr em mais distribuições) + `Nexo-x86_64.AppImage` + `Nexo.exe` + instalador → release com `SHA256SUMS`.
 ```sh
 # APP_VERSION em nexo/core/util.py tem de ser igual à etiqueta (o workflow confirma)
-git tag -a v2.2 -m "Nexo 2.2" && git push origin v2.2
+git tag -a v2.3 -m "Nexo 2.3" && git push origin v2.3
 ```
 Para o Nexo instalado se atualizar sozinho, ponha o repositório em `UPDATE_REPO` (`nexo/core/util.py`, ex.:
 `"utilizador/nexo"`): verifica uma vez por dia, confirma o SHA-256 que o GitHub publica e pede autorização.
@@ -115,7 +118,8 @@ assim»). Para assinar:
 como `.corrompido` antes de ser reescrito), `historico.db` (sensores e sessões de jogo), histórico do benchmark,
 `ferramentas/` (PresentMon, LibreHardwareMonitor) e
 `tweaks_backup.json` com os valores originais de cada ajuste (é isto que permite restaurar) e `wallpapers/`
-com os fundos escolhidos. `smart.json` guarda a última leitura da saúde dos discos.
+com os fundos escolhidos. `smart.json` guarda a última leitura da saúde dos discos, `fiabilidade.json` a última análise da Fiabilidade,
+`throttling.json` os episódios de limitação por temperatura e `alteracoes.json` as mudanças feitas pelo Nexo (comparação dos benchmarks).
 
 **Registo de erros:** `nexo.log` (rotativo, máx. ~3 MB) na mesma pasta — erros não tratados ficam lá com o
 traceback e o Nexo mostra a janela «Ocorreu um erro» (com *Copiar detalhes*) em vez de fechar. Falhas graves do
@@ -139,7 +143,8 @@ nexo/
     sysinfo.py  sensors.py  stress.py   bench.py     gpubench.py   processes.py  memory.py
     tweaks.py   startup.py  debloat.py  apps.py      systools.py   updates.py    drivers.py
     diskscan.py disksafety.py cleanup.py autoclean.py smart.py   diskbench.py  antivirus.py
-    games.py    sessions.py fps.py      fans.py      lhm.py        network.py    netprocs.py
+    games.py    sessions.py fps.py      power.py     lhm.py        network.py    netprocs.py
+    reliability.py throttle.py slowdiag.py changes.py
     speedtest.py history.py snapshot.py watch.py     backup.py     selfupdate.py
     alertlog.py healthscore.py schedule.py gameprofile.py i18n.py i18n_en.py
     wallhaven.py desktopwp.py log.py    util.py
@@ -147,9 +152,9 @@ nexo/
     main_window.py (menu, navegação, bandeja)  nav.py (peças do menu)  mw_background.py (vigilância,
     tarefas, atualizações)  mw_game.py (modo jogo)  alertcenter.py  wizard.py  gameprofile_card.py
     i18n_qt.py  palette.py  theme.py  widgets.py  icons.py  logo.py  historyview.py
-    overlay.py  netmonitor.py  hwcontrol.py  crash.py  wallhaven_dialog.py  pages/*.py
+    overlay.py  netmonitor.py  slowdiag_card.py  crash.py  wallhaven_dialog.py  pages/*.py
 tests/         testes (unittest)
-packaging/     arch/PKGBUILD · windows/nexo.iss (instalador)
+packaging/     arch/PKGBUILD · windows/nexo.iss (instalador) · appimage/build_appimage.sh
 assets/        logótipo (nexo.png, nexo.ico)
 Aplicacao/
   Linux/       Nexo (executável) · instalar.sh · LEIA-ME.txt

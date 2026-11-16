@@ -155,7 +155,7 @@ class Wizard(QDialog):
         card = self._card(lay)
         for ic, t, d in (("thermo", "Ver", "Temperaturas, carga, discos e saúde do PC em tempo real."),
                          ("shield", "Proteger", "Avisos, antivírus, pontos de restauro antes de mexer no sistema."),
-                         ("zap", "Otimizar", "Limpeza, arranque, ventoinhas e um modo jogo com overlay e perfis.")):
+                         ("zap", "Otimizar", "Limpeza, arranque, testes e um modo jogo com overlay e perfis.")):
             h = QHBoxLayout()
             h.setSpacing(12)
             h.addWidget(icon_badge(ic, 32, 16))
@@ -239,7 +239,7 @@ class Wizard(QDialog):
             card.addWidget(SettingRow(t.name, t.desc, cb))
 
     def _games(self, lay):
-        self._head(lay, "gamepad", "Jogos e ventoinhas", "O modo jogo deteta Steam, Proton, Wine, Lutris, Heroic, "
+        self._head(lay, "gamepad", "Jogos", "O modo jogo deteta Steam, Proton, Wine, Lutris, Heroic, "
                    "Epic, GOG e Xbox.")
         card = self._card(lay)
         card.addWidget(SettingRow("Detetar jogos", "Verifica a cada 4 segundos (quase não gasta nada).",
@@ -247,12 +247,6 @@ class Wizard(QDialog):
         card.addWidget(separator())
         card.addWidget(SettingRow("Overlay ao jogar", "Temperaturas, FPS e uso por cima do jogo.",
                                   self._toggle("overlay_auto")))
-        card.addWidget(separator())
-        b = QPushButton("Configurar ventoinhas no fim")
-        b.setCheckable(True)
-        b.toggled.connect(lambda on: setattr(self, "go_to", "Ventoinhas" if on else None))
-        card.addWidget(SettingRow("Ventoinhas", "Perfis silencioso/equilibrado/desempenho e curvas próprias. "
-                                  "O Nexo só mexe nelas se escolher um perfil.", b))
 
     def _done(self, lay):
         self._head(lay, "check", "Pronto!", "O menu está agrupado: SISTEMA para ver o estado do PC, DESEMPENHO para "
