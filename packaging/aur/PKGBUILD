@@ -8,7 +8,7 @@ pkgrel=1
 pkgdesc="Utilitário do PC: sensores, saúde dos discos, otimização, modo jogo, limpeza, antivírus e benchmarks"
 arch=('any')
 url="https://github.com/$_repo"
-license=('custom')
+license=('MIT')
 depends=('python' 'pyside6' 'python-psutil' 'polkit')
 optdepends=('smartmontools: saúde dos discos (S.M.A.R.T.)'
             'pacman-contrib: lista de atualizações sem sincronizar a base de dados (checkupdates)'

@@ -52,7 +52,7 @@ def manifests(pkg_id: str, repo: str, version: str, sha: str) -> dict[str, str]:
         + f"ManifestType: installer\nManifestVersion: {SCHEMA}\n",
         f"{pkg_id}.locale.pt-PT.yaml": head.format("defaultLocale") + common
         + f"PackageLocale: pt-PT\nPublisher: {owner}\nPackageName: Nexo\n"
-        + f"PackageUrl: https://github.com/{repo}\nLicense: Ver o repositório\n"
+        + f"PackageUrl: https://github.com/{repo}\nLicense: MIT\nLicenseUrl: https://github.com/{repo}/blob/main/LICENSE\n"
         + "ShortDescription: Utilitário do PC — sensores, saúde dos discos, otimização, modo jogo, limpeza, "
           "antivírus e benchmarks.\n"
         + "Tags:\n- benchmark\n- limpeza\n- otimizacao\n- sensores\n- jogos\n"

@@ -178,3 +178,7 @@ Aplicacao/
   Windows/     Nexo.exe · LEIA-ME.txt
 run_nexo.py   ponto de entrada
 ```
+
+## Licença
+
+[MIT](LICENSE) — pode usar, modificar e distribuir, mantendo o aviso de copyright.
