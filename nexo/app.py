@@ -6,6 +6,9 @@ import sys
 
 def main() -> int:
     multiprocessing.freeze_support()  # necessário no .exe do Windows (PyInstaller)
+    from . import cli
+    if cli.wants_cli(sys.argv):   # nexo --saude, --limpar, --relatorio… (sem janela)
+        return cli.main(sys.argv)
     from .core import log as nlog
     if "--gpubench" in sys.argv:
         nlog.setup("gpubench")  # benchmark da placa gráfica (processo à parte, ver core/gpubench.py)

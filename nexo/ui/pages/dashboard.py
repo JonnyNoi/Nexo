@@ -39,6 +39,14 @@ class DashboardPage(Page):
         self.actions_box.setSpacing(4)
         right.addLayout(self.actions_box)
         right.addStretch(1)
+        wk = QHBoxLayout()
+        wk.addStretch(1)
+        self.btn_week = QPushButton("Relatório da semana")
+        self.btn_week.setObjectName("Ghost")
+        self.btn_week.setToolTip("Como esteve o PC nos últimos 7 dias, comparado com a semana anterior.")
+        self.btn_week.clicked.connect(self.open_weekly)
+        wk.addWidget(self.btn_week)
+        right.addLayout(wk)
         sc.addLayout(right, 1)
         self.score_card.add(sc)
         self.add(self.score_card)
@@ -264,10 +272,19 @@ class DashboardPage(Page):
         for c in range(2):
             g.setColumnStretch(c, 1)
 
+    def open_weekly(self, report=None):
+        from ..weekly_dialog import WeeklyDialog
+        WeeklyDialog(self, report).exec()
+
     def _update_score(self, checks):
         actions = {c.text: c.action for c in self._slow}
         cs = [healthscore.Check(k, t, p, actions.get(t, "Resolver")) for k, t, p in checks]
         s = healthscore.score(cs)
+        try:
+            from ...core import weekly
+            weekly.record_score(s)
+        except OSError:
+            pass
         txt, kind = healthscore.grade(s)
         self.r_score.set(s, str(s), "de 100", kind)
         self.score_title.setText(f"Saúde do PC: {txt}")

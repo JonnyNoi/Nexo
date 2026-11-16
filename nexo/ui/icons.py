@@ -29,6 +29,7 @@ _P = {
     "alert": '<path d="M12 3l9.5 17h-19L12 3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="C"/>',
     "x": '<path d="M6 6l12 12M18 6L6 18"/>',
     "bell": '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
+    "battery": '<rect x="2.5" y="7" width="17" height="10" rx="2"/><path d="M21.5 10.5v3"/><path d="M6 10v4M9.5 10v4"/>',
     "clock": '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
     "keyboard": '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01'
                 'M18 10h.01M7 14h10"/>',

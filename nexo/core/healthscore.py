@@ -59,7 +59,39 @@ def slow_checks(now: float | None = None) -> list[Check]:
     out += _protection()
     out += _reliability(now)
     out += _throttling(now)
+    out += _battery()
+    out += _memory_speed()
+    out += _boot()
     return out
+
+
+def _battery() -> list[Check]:
+    from . import battery
+    out = []
+    for b in battery.cached():
+        kind, _why = b.verdict()
+        h = b.health_pct
+        if h is not None and kind != "ok":
+            out.append(Check(kind, f"Bateria gasta: guarda só {h:.0f} % da carga original.", "Bateria", "Ver"))
+    return out
+
+
+def _memory_speed() -> list[Check]:
+    from . import ramspeed
+    v = ramspeed.check(ramspeed.cached())
+    if v and v.kind == "warn":
+        what = f"{v.current} MT/s em vez de {v.rated}" if v.rated else f"{v.current} MT/s"
+        return [Check("warn", f"Memória RAM abaixo da velocidade ({what}) — ligue o XMP/EXPO no BIOS.",
+                      "Informação", "Ver")]
+    return []
+
+
+def _boot() -> list[Check]:
+    from . import boottime
+    hist = boottime.history()
+    if hist and hist[-1].total >= boottime.SLOW_TOTAL:
+        return [Check("warn", f"O PC demora {hist[-1].total:.0f} s a arrancar.", "Arranque", "Ver")]
+    return []
 
 
 def _updates(now: float) -> list[Check]:

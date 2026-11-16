@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import html
-import json
 import time
 
 from PySide6.QtCore import Qt
@@ -9,7 +7,6 @@ from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QHeaderView, QListWidge
                                QTableWidgetItem)
 
 from ...core import sysinfo
-from ...core.util import APP_NAME, APP_VERSION
 from ..widgets import Card, Page, label, notify, run_async
 
 
@@ -92,22 +89,11 @@ class SystemPage(Page):
         if path.endswith(".json") or "JSON" in flt:
             if not path.endswith(".json"):
                 path += ".json"
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump({k: dict(v) for k, v in self.data.items()}, f, indent=2, ensure_ascii=False)
+            text = sysinfo.report_json(self.data)
         else:
             if not path.endswith(".html"):
                 path += ".html"
-            parts = [f"<!doctype html><meta charset='utf-8'><title>Relatório {APP_NAME}</title>"
-                     "<style>body{font-family:system-ui,sans-serif;max-width:900px;margin:40px auto;padding:0 16px;"
-                     "background:#0e1014;color:#e7e9ee}h1{color:#ff6b3d}h2{border-bottom:1px solid #2a2f3b;padding-bottom:6px}"
-                     "table{width:100%;border-collapse:collapse}td{padding:6px 8px;border-bottom:1px solid #1e222b;vertical-align:top}"
-                     "td:first-child{color:#8a92a6;width:35%}</style>",
-                     f"<h1>{APP_NAME} — relatório do sistema</h1><p>Gerado em {time.strftime('%d/%m/%Y %H:%M')} "
-                     f"pelo {APP_NAME} {APP_VERSION}</p>"]
-            for cat, rows in self.data.items():
-                parts.append(f"<h2>{html.escape(cat)}</h2><table>")
-                parts += [f"<tr><td>{html.escape(k)}</td><td>{html.escape(str(v))}</td></tr>" for k, v in rows]
-                parts.append("</table>")
-            with open(path, "w", encoding="utf-8") as f:
-                f.write("".join(parts))
+            text = sysinfo.report_html(self.data)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
         notify(f"Relatório guardado em {path}", "ok")

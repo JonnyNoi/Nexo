@@ -102,6 +102,14 @@ def _page_factories(hub, on_settings):
         from .pages.updates import UpdatesPage
         return UpdatesPage()
 
+    def battery():
+        from .pages.battery import BatteryPage
+        return BatteryPage()
+
+    def programs():
+        from .pages.programs import ProgramsPage
+        return ProgramsPage()
+
     def settings():
         from .pages.settings import SettingsPage
         return SettingsPage(on_settings)
@@ -111,9 +119,17 @@ def _page_factories(hub, on_settings):
     opt = [("Otimização", "zap", optimize), ("Arranque", "power", startup)]
     if IS_WIN:
         opt.append(("Windows debloat", "broom", debloat))
+    from ..core import battery as _bat
+    try:
+        has_bat = _bat.has_battery()
+    except Exception:  # noqa: BLE001 — nunca impedir o arranque da janela
+        has_bat = False
+    sysitems = [("Informação", "info", system), ("Sensores", "thermo", sensors)]
+    if has_bat:
+        sysitems.append(("Bateria", "battery", battery))
     return [
         (None, [("Visão geral", "home", dashboard)]),
-        ("SISTEMA", [("Informação", "info", system), ("Sensores", "thermo", sensors),
+        ("SISTEMA", [*sysitems,
                      ("Discos", "hdd", [("Saúde dos discos", "hdd", diskhealth),
                                         ("Espaço em disco", "disk", disk)]),
                      ("Processos", "list", processes),
@@ -124,7 +140,8 @@ def _page_factories(hub, on_settings):
                         ("Testes", "gauge", [("Benchmark", "gauge", benchmark),
                                              ("Stress test", "flame", stress)])]),
         ("FERRAMENTAS", [("Software", "upgrade", [("Atualizações", "upgrade", updates),
-                                                  ("Instalar aplicações", "download", apps)]),
+                                                  ("Instalar aplicações", "download", apps),
+                                                  ("Programas instalados", "package", programs)]),
                          ("Internet", "wifi", internet),
                          ("Utilitários", "wrench", [("Utilitários", "wrench", tools),
                                                     ("Tarefas agendadas", "clock", tasks)]),

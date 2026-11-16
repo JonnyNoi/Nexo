@@ -53,6 +53,11 @@ class SettingsPage(Page):
                           "Avisa de desligares sem aviso, falhas do sistema, erros de hardware e do controlador "
                           "gráfico (verificado no arranque e a cada 6 horas — página Fiabilidade).",
                           self._toggle("alert_reliability")))
+        al.add(separator())
+        al.add(SettingRow("Relatório da semana",
+                          "Uma vez por semana, um resumo de como esteve o PC (saúde, estabilidade, arranque, jogos) "
+                          "com aviso no centro de alertas. Também em Visão geral → Relatório da semana.",
+                          self._toggle("weekly_report")))
         self.add(al)
 
         # ---------------------------------------------------------------- proteção

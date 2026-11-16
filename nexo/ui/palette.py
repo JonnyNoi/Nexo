@@ -21,12 +21,14 @@ from .widgets import SettingRow, icon_badge, label
 # página → [(função, palavras-chave extra)]; a função é procurada na página para a destacar
 FEATURES: dict[str, list[tuple[str, str]]] = {
     "Visão geral": [("Saúde do PC", "pontuação nota estado geral o que fazer recomendações"),
+                    ("Relatório da semana", "resumo semanal semana relatório evolução"),
                     ("CPU × GPU", "gráfico temperatura carga consumo watts"),
                     ("Saúde do sistema", "resolver problemas avisos serviços com falha swap tempo ligado"),
                     ("Porque está lento?", "lento lentidão pesado devagar trava diagnóstico encravado"),
                     ("Utilização", "ram vram disco rede anéis")],
     "Informação": [("Exportar relatório", "html json guardar especificações specs hardware"),
-                   ("Processador", "cpu caches instruções"), ("Memória", "ram módulos slots"),
+                   ("Processador", "cpu caches instruções"),
+                   ("Memória", "ram módulos slots velocidade xmp expo docp mhz mt/s lenta"),
                    ("Placa gráfica", "gpu vram pcie vbios opengl vulkan driver"),
                    ("Placa-mãe", "motherboard bios uefi secure boot"), ("Discos", "ssd nvme hdd"),
                    ("Rede", "ip mac wifi ethernet")],
@@ -61,6 +63,7 @@ FEATURES: dict[str, list[tuple[str, str]]] = {
                  ("Latência", "ping jitter variação lag jogos bufferbloat"),
                  ("O que a sua ligação permite", "4k streaming chamadas jogos online qualidade"),
                  ("Ligação à internet", "rede wifi cabo offline sem internet router portal diagnóstico"),
+                 ("Wi-Fi", "wifi sinal fraco canal interferência 2,4 ghz 5 ghz router redes vizinhas"),
                  ("Histórico", "testes anteriores")],
     "Instalar aplicações": [("Instalar", "programas apps winget flatpak flathub navegador jogos steam discord "
                                          "vlc obs spotify chrome firefox"),
@@ -74,7 +77,12 @@ FEATURES: dict[str, list[tuple[str, str]]] = {
     "Tarefas agendadas": [("Limpeza automática", "agendar automático semanal mensal limpar caches temporários"),
                           ("Análise antivírus rápida", "agendada automática vírus semanal"),
                           ("Saúde dos discos (S.M.A.R.T.)", "lembrete agendado smart disco")],
-    "Arranque": [("Arranque", "startup autostart iniciar com o sistema systemd programas ao ligar")],
+    "Arranque": [("Arranque", "startup autostart iniciar com o sistema systemd programas ao ligar"),
+                 ("Tempo de arranque", "boot demora a ligar lento arrancar segundos bios uefi fast boot "
+                                       "systemd-analyze blame")],
+    "Bateria": [("Bateria", "portátil laptop saúde desgaste ciclos capacidade autonomia carga battery")],
+    "Programas instalados": [("Desinstalar", "remover apagar programas instalados uninstall adicionar remover "
+                                             "pacotes tamanho espaço")],
     "Windows debloat": [("Apps pré-instaladas", "remover bloatware candy crush tiktok cortana copilot clipchamp"),
                         ("Telemetria", "privacidade publicidade recall bing widgets anúncios sugestões"),
                         ("Restaurar originais", "reverter")],

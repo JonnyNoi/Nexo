@@ -116,6 +116,7 @@ DEFAULT_SETTINGS = {
     "alert_smart": True,     # avisar quando a saúde de um disco (S.M.A.R.T.) piora
     "alert_throttle": True,  # avisar quando a CPU/GPU baixa o clock por temperatura
     "alert_reliability": True,  # avisar de desligares sem aviso, falhas do sistema e erros de hardware
+    "weekly_report": True,  # relatório da semana (Visão geral) com aviso no centro de alertas
     "rel_seen": 0,           # hora do último evento de fiabilidade já avisado
     "history": True,         # guardar o histórico dos sensores (média por minuto, 7 dias)
     "snapshot_before": True,  # criar ponto de restauro antes de alterar o sistema

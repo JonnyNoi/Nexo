@@ -53,12 +53,37 @@ class BackgroundMixin:
         self._rel_timer.timeout.connect(self._reliability_check)
         self._rel_timer.start(6 * 3600_000)
         QTimer.singleShot(60_000, self._reliability_check)
+        # tempo de arranque, velocidade da RAM e bateria (caches para a Saúde do PC); relatório da semana
+        QTimer.singleShot(40_000, self._daily_probes)
+        self._probe_timer = QTimer(self)
+        self._probe_timer.timeout.connect(self._daily_probes)
+        self._probe_timer.start(6 * 3600_000)
         # throttling (CPU/GPU a baixar o clock por temperatura)
         from ..core import throttle
         self.throttle = throttle.Detector(*throttle.limits())
         self._thr_tick = 0
         self._thr_alerted: dict[str, float] = {}
         self.hub.updated.connect(self._throttle_tick)
+
+    # ------------------------------------------------------------------ arranque, RAM, bateria, relatório semanal
+    def _daily_probes(self):
+        if getattr(self, "game", None) is not None:
+            return
+
+        def work():
+            from ..core import battery, boottime, ramspeed, weekly
+            for fn in (boottime.record, ramspeed.modules, battery.batteries):
+                try:
+                    fn()
+                except Exception:  # noqa: BLE001 — uma sonda falhada não impede as outras
+                    import logging
+                    logging.getLogger("nexo.probes").warning("%s falhou", fn.__module__, exc_info=True)
+            return weekly.generate() if weekly.due() else None
+
+        def done(rep):
+            if rep is not None:
+                self._alert("📋 " + rep.summary(), "info", "Visão geral")
+        run_async(work, on_done=done, on_fail=lambda _m: None)
 
     # ------------------------------------------------------------------ fiabilidade e throttling
     def _reliability_check(self):

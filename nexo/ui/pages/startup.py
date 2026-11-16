@@ -15,6 +15,9 @@ class StartupPage(Page):
         self.btn = QPushButton("Atualizar")
         self.head.addWidget(self.btn)
         self.btn.clicked.connect(self.load)
+        from ..boot_card import BootCard
+        self.boot = BootCard()
+        self.add(self.boot)
         card = Card()
         self.search = QLineEdit()
         self.search.setPlaceholderText("Filtrar…")
@@ -33,6 +36,7 @@ class StartupPage(Page):
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(40)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setMinimumHeight(380)
         card.add(self.table, 1)
         hint = ("Itens de \"HKLM\" e da pasta Arranque (todos) são de todos os utilizadores e precisam de administrador."
                 if IS_WIN else "Itens do sistema (/etc/xdg/autostart) são desativados só para o seu utilizador. "
@@ -48,6 +52,7 @@ class StartupPage(Page):
             self.load()
 
     def load(self):
+        self.boot.load()
         run_async(startup.list_items, on_done=self._show)
 
     def _show(self, items):

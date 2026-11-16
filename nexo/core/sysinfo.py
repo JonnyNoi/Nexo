@@ -231,6 +231,29 @@ def _ram_section(wmi: dict | None = None) -> Section:
             rows.append((f"Módulo {m.get('DeviceLocator', '?')}",
                          f"{human_bytes(m.get('Capacity') or 0)} {t} {m.get('ConfiguredClockSpeed') or m.get('Speed')} MT/s"
                          f" · {(m.get('Manufacturer') or '').strip()} {(m.get('PartNumber') or '').strip()}"))
+    rows.extend(_ram_speed_rows(wmi))
+    return rows
+
+
+def _ram_speed_rows(wmi: dict | None) -> Section:
+    """Velocidade atual vs. a anunciada pelo módulo (XMP/EXPO desligado é muito comum)."""
+    from . import ramspeed
+    try:
+        mods = ramspeed.parse_windows(wmi.get("ram")) if wmi else ramspeed.modules()
+        if wmi:
+            from .util import save_json
+            save_json(ramspeed.CACHE, [m.__dict__ for m in mods])
+        v = ramspeed.check(mods)
+    except Exception:  # noqa: BLE001
+        return []
+    if not v:
+        return []
+    rows: Section = []
+    if IS_LINUX and not (os.geteuid() == 0 and which("dmidecode")):   # com root o dmidecode já os listou
+        for m in mods:
+            rows.append((f"Módulo {m.slot}", f"{human_bytes(m.size)} {m.kind} {m.configured or '?'} MT/s · "
+                                             f"{m.manufacturer} {m.part}".strip()))
+    rows.append(("Velocidade", ("⚠ " if v.kind == "warn" else "") + v.text))
     return rows
 
 
@@ -427,3 +450,28 @@ def summary() -> dict[str, str]:
         "ram": human_bytes(psutil.virtual_memory().total, 0),
         "gpu": gpu or "—",
     }
+
+
+# =========================================================================== relatório (Informação → Exportar, nexo --relatorio)
+def report_json(data: dict[str, Section]) -> str:
+    import json
+    return json.dumps({k: dict(v) for k, v in data.items()}, indent=2, ensure_ascii=False)
+
+
+def report_html(data: dict[str, Section]) -> str:
+    import html
+    import time
+
+    from .util import APP_NAME, APP_VERSION
+    parts = [f"<!doctype html><meta charset='utf-8'><title>Relatório {APP_NAME}</title>"
+             "<style>body{font-family:system-ui,sans-serif;max-width:900px;margin:40px auto;padding:0 16px;"
+             "background:#0e1014;color:#e7e9ee}h1{color:#ff6b3d}h2{border-bottom:1px solid #2a2f3b;padding-bottom:6px}"
+             "table{width:100%;border-collapse:collapse}td{padding:6px 8px;border-bottom:1px solid #1e222b;vertical-align:top}"
+             "td:first-child{color:#8a92a6;width:35%}</style>",
+             f"<h1>{APP_NAME} — relatório do sistema</h1><p>Gerado em {time.strftime('%d/%m/%Y %H:%M')} "
+             f"pelo {APP_NAME} {APP_VERSION}</p>"]
+    for cat, rows in data.items():
+        parts.append(f"<h2>{html.escape(cat)}</h2><table>")
+        parts += [f"<tr><td>{html.escape(k)}</td><td>{html.escape(str(v))}</td></tr>" for k, v in rows]
+        parts.append("</table>")
+    return "".join(parts)

@@ -247,6 +247,10 @@ class InternetPage(Page):
         self.btn_net.clicked.connect(self._test_net)
         row.addWidget(netc, 1)
         self.add(row)
+        from ..wifi_card import WifiCard
+        self.wifi = WifiCard()
+        self.add(self.wifi)
+        self._wifi_loaded = False
         monitor().checked.connect(self._show_net)
         if monitor().status is not None:
             self._show_net(monitor().status)
@@ -311,6 +315,9 @@ class InternetPage(Page):
 
     # ================================================================== programas
     def on_show(self):
+        if not self._wifi_loaded:
+            self._wifi_loaded = True
+            self.wifi.load()
         self._np_tick()
         self.np_timer.start(2000)
 
