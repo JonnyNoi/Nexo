@@ -75,6 +75,84 @@ class UiSmoke(unittest.TestCase):
                 self.assertEqual(w.stack.currentIndex(), i)
                 self.assertTrue(w.btn_of[i].isChecked(), name)
 
+    def test_every_page_in_light_theme(self):
+        w = self.win
+        w.set_theme("claro")
+        self.addCleanup(w.set_theme, "escuro")
+        for i, name in enumerate(w.names):
+            with self.subTest(page=name):
+                w.go(i)
+                self.app.processEvents()
+                self.assertIsNotNone(w.pages[i], name)
+
+    def test_new_pages_and_cards(self):
+        w = self.win
+        w.go_name("Programas instalados")
+        page = w.pages[w.current]
+        from nexo.core.programs import Program
+        page._show([Program("firefox", "1", size=300 << 20, source="pacman", ident="firefox"),
+                    Program("glibc", "2", size=50 << 20, source="pacman", ident="glibc", is_app=False, protected=True)])
+        self.assertIn("1 de 2", page.count.text())          # "Só aplicações" esconde a glibc
+        page.only_apps.setChecked(False)
+        self.assertIn("2 de 2", page.count.text())
+        w.go_name("Arranque")
+        from nexo.core import boottime
+        card = w.pages[w.current].boot
+        card._render(boottime.Boot("x", 0, 75.0, {"firmware": 14.0, "kernel": 1.0, "userspace": 60.0},
+                                   [boottime.Delay("lento.service", 9.0)]))
+        self.assertIn("75,0", card.t_total.v.text())
+        self.assertGreaterEqual(card.tips.count(), 2)
+        w.go_name("Internet")
+        from nexo.core import wifi
+        wc = w.pages[w.current].wifi
+        wc._render(wifi.WifiState(wifi.Net("Casa", 40, 6, "2.4 GHz", in_use=True), []))
+        self.assertEqual(wc.t_sig.v.text(), "40 %")
+        wc._render(wifi.WifiState(None, [], False, "Sem Wi-Fi"))
+        self.assertTrue(wc.tiles.isHidden())
+        from nexo.ui.pages.battery import BatteryPage
+        from nexo.core.battery import Battery
+        bp = BatteryPage()
+        bp._render([Battery("BAT0", 50, 40, 300, 80, "A descarregar", power_w=8.0)])
+        bp._render([])
+        from nexo.core import weekly
+        from nexo.ui.weekly_dialog import WeeklyDialog
+        dlg = WeeklyDialog(w, weekly.Report(0, 7 * 86400, 80, 85, [weekly.Line("warn", "Teste", "Fiabilidade")]))
+        self.assertIn("80/100", dlg.title.text())
+        dlg.close()
+
+    def test_window_in_english(self):
+        """Abre a janela e todas as páginas em inglês num processo à parte (a tradução da interface Qt é
+        global e não se desliga — não pode contaminar os outros testes)."""
+        import subprocess
+        import sys
+        code = (
+            "import os, sys\n"
+            "from unittest import mock\n"
+            "from PySide6.QtWidgets import QApplication\n"
+            "app = QApplication([])\n"
+            "from nexo.core import i18n, util, power\n"
+            "from nexo.ui import i18n_qt, theme, widgets, netmonitor\n"
+            "i18n.set_lang_for_tests('en')\n"
+            "for p in (mock.patch.object(widgets.Task, 'start', lambda self: self),\n"
+            "          mock.patch.object(widgets.SensorHub, '_loop', lambda self: None),\n"
+            "          mock.patch.object(netmonitor.NetMonitor, 'start', lambda *a, **k: None)):\n"
+            "    p.start()\n"
+            "i18n_qt.install(app); theme.apply(app)\n"
+            "from nexo.ui.main_window import MainWindow\n"
+            "w = MainWindow(start_hidden=True)\n"
+            "for i in range(len(w.names)):\n"
+            "    w.go(i); app.processEvents()\n"
+            "assert w.btn_of[w.names.index('Visão geral')].text().strip() == 'Overview', w.btn_of[0].text()\n"
+            "w._quitting = True\n"
+            "print('OK', len(w.names), flush=True)\n"
+            "os._exit(0)\n")
+        env = dict(os.environ, QT_QPA_PLATFORM="offscreen", XDG_CONFIG_HOME=self.tmp.name, APPDATA=self.tmp.name)
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        r = subprocess.run([sys.executable, "-c", code], cwd=root, env=env, capture_output=True, text=True,
+                           timeout=120)
+        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+        self.assertIn("OK", r.stdout)
+
     def test_groups_show_tabs_and_remember_last(self):
         w = self.win
         groups = [g for g in w.groups if len(g) > 1]
