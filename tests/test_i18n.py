@@ -46,6 +46,33 @@ class Catalogue(unittest.TestCase):
             with self.subTest(k=k):
                 self.assertEqual(k.count("{}"), v.count("{}"))
 
+    def test_more_catalog(self):
+        from nexo.core.i18n_en_more import EN_MORE, TEMPLATES_MORE
+        for k, v in EN_MORE.items():
+            with self.subTest(k=k):
+                self.assertTrue(v.strip())
+                self.assertNotIn("{}", k, "modelos vão em TEMPLATES_MORE")
+        for k, v in TEMPLATES_MORE.items():
+            with self.subTest(k=k):
+                self.assertEqual(k.count("{}"), v.count("{}"))
+
+    def test_new_pages_translated(self):
+        """As páginas novas da 2.3 não podem ter texto visível por traduzir (o detetor apanha f-strings como
+        modelos com {}). Para outras páginas: python -m nexo.core.i18n nexo/ui/pages/x.py"""
+        import re
+        from pathlib import Path
+
+        from nexo.core.i18n import _scan, missing
+        root = Path(__file__).resolve().parent.parent / "nexo"
+        files = [root / f for f in ("ui/pages/battery.py", "ui/pages/programs.py", "ui/boot_card.py",
+                                    "ui/wifi_card.py", "ui/weekly_dialog.py", "core/weekly.py", "core/boottime.py",
+                                    "core/battery.py", "core/ramspeed.py", "core/wifi.py")]
+        pt = re.compile(r"[ãõçáéíóúâêô]|\b(de|do|da|em|não|para|com|que|os|as)\b", re.I)
+        todo = [s for s in missing(_scan(files)) if pt.search(s) and "{{" not in s and "\\" not in s]
+        # palavras-chave internas (não aparecem no ecrã)
+        todo = [s for s in todo if s != "taxa de rece"]
+        self.assertEqual(todo, [])
+
     def test_menu_is_translated(self):
         names = ["Visão geral", "Informação", "Sensores", "Discos", "Saúde dos discos", "Espaço em disco",
                  "Processos", "Fiabilidade", "Antivírus", "Otimização", "Arranque", "Modo jogo", "Testes",

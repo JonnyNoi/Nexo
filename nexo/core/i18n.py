@@ -37,7 +37,8 @@ def set_lang_for_tests(v: str | None) -> None:
 @lru_cache(maxsize=1)
 def _catalog() -> dict[str, str]:
     from .i18n_en import EN
-    return EN
+    from .i18n_en_more import EN_MORE
+    return {**EN_MORE, **EN}
 
 
 @lru_cache(maxsize=1)
@@ -49,8 +50,9 @@ def _upper() -> dict[str, str]:
 @lru_cache(maxsize=1)
 def _templates() -> list[tuple[re.Pattern, str]]:
     from .i18n_en import TEMPLATES
+    from .i18n_en_more import TEMPLATES_MORE
     out = []
-    for src, dst in TEMPLATES.items():
+    for src, dst in {**TEMPLATES_MORE, **TEMPLATES}.items():
         out.append((re.compile("(.+?)".join(re.escape(p) for p in src.split("{}")), re.S), dst))
     # os modelos mais compridos primeiro (mais específicos)
     out.sort(key=lambda t: -len(t[0].pattern))
@@ -98,25 +100,59 @@ def missing(strings) -> list[str]:
         set_lang_for_tests(prev)
 
 
+_LOG_METHODS = {"debug", "info", "warning", "error", "exception", "critical"}
+_VISIBLE = re.compile(r"[a-zçãõáéíóúâêô]{3,} [a-zçãõáéíóúâêô]{2,}", re.I)
+
+
+def _template(node) -> str | None:
+    """f-string → modelo com {} (como em TEMPLATES): f"Ligado há {x}" → "Ligado há {}"."""
+    import ast
+    parts = []
+    for v in node.values:
+        if isinstance(v, ast.Constant) and isinstance(v.value, str):
+            parts.append(v.value.replace("{", "{{").replace("}", "}}"))
+        else:
+            parts.append("{}")
+    return "".join(parts)
+
+
 def _scan(paths) -> list[str]:
-    """Constantes de texto que parecem frases visíveis (heurística)."""
+    """Textos que parecem frases visíveis (heurística). As f-strings aparecem como modelos com {};
+    mensagens do registo (log.warning(…)) e docstrings ficam de fora."""
     import ast
     from pathlib import Path
-    out = []
+    out: list[str] = []
+    seen: set[str] = set()
     for p in paths:
         for f in ([Path(p)] if str(p).endswith(".py") else Path(p).rglob("*.py")):
             if f.name.startswith("i18n"):
                 continue
             tree = ast.parse(f.read_text(encoding="utf-8"))
-            docs = {id(n.body[0].value) for n in ast.walk(tree)
-                    if isinstance(n, (ast.Module, ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef))
-                    and n.body and isinstance(n.body[0], ast.Expr) and isinstance(n.body[0].value, ast.Constant)}
+            skip: set[int] = set()
             for n in ast.walk(tree):
-                if (isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docs
-                        and re.search(r"[a-zçãõáéíóúâêô]{3,} [a-zçãõáéíóúâêô]{2,}", n.value, re.I)
-                        and not n.value.startswith(("http", "/", "$", "-", "Q", "{", "%"))
-                        and n.value not in out):
-                    out.append(n.value)
+                if isinstance(n, (ast.Module, ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)) and n.body \
+                        and isinstance(n.body[0], ast.Expr) and isinstance(n.body[0].value, ast.Constant):
+                    skip.add(id(n.body[0].value))
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in _LOG_METHODS:
+                    for a in n.args:
+                        for sub in ast.walk(a):
+                            skip.add(id(sub))
+                if isinstance(n, ast.JoinedStr):
+                    for v in n.values:
+                        skip.add(id(v))
+            for n in ast.walk(tree):
+                if id(n) in skip:
+                    continue
+                if isinstance(n, ast.JoinedStr):
+                    val = _template(n)
+                elif isinstance(n, ast.Constant) and isinstance(n.value, str):
+                    val = n.value
+                else:
+                    continue
+                if (val and _VISIBLE.search(val) and not val.startswith(("http", "/", "$", "-", "Q", "%"))
+                        and val not in seen):
+                    seen.add(val)
+                    out.append(val)
     return out
 
 
