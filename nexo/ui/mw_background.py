@@ -202,7 +202,11 @@ class BackgroundMixin:
 
     def _auto_updates(self):
         import time as _t
+        from ..core import components
         from ..core import updates as up
+        if components.due():   # não precisa de internet: só consulta o gestor de pacotes / WMI
+            from .widgets import run_async
+            run_async(components.check, on_done=lambda _r: None, on_fail=lambda _m: None)
         if not get_setting("updates_auto", True) or self.net.online is False:
             return
         if _t.time() - up.cached().get("time", 0) >= 6 * 3600:

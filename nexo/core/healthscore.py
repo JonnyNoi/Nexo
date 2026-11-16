@@ -56,6 +56,7 @@ def slow_checks(now: float | None = None) -> list[Check]:
     out += _updates(now)
     out += _antivirus(now)
     out += _drivers()
+    out += _components()
     out += _protection()
     out += _reliability(now)
     out += _throttling(now)
@@ -131,6 +132,17 @@ def _drivers() -> list[Check]:
         more = f" (+{len(old) - 1})" if len(old) > 1 else ""
         return [Check("warn", f"Driver desatualizado: {name}{more}.", "Atualizações", "Ver")]
     return []
+
+
+def _components() -> list[Check]:
+    from . import components
+    found = components.cached_findings()
+    if not found:
+        return []
+    worst = next((f for f in found if f.kind == "bad"), found[0])
+    more = f" (+{len(found) - 1})" if len(found) > 1 else ""
+    from .i18n import tr   # traduzir o título antes de lhe juntar o "(+n)" (senão o modelo não o reconhece)
+    return [Check(worst.kind, f"{tr(worst.title)}{more}.", "Atualizações", "Resolver")]
 
 
 def _reliability(now: float) -> list[Check]:

@@ -2795,6 +2795,71 @@ EN_MORE: dict[str, str] = {
         "No system crashes or unexpected shutdowns.",
     "O sistema não indica a capacidade original desta bateria.":
         "The system doesn't report this battery's original capacity.",
+    # 2.3 — drivers e componentes em falta
+    'não está bem configurado':
+        'is not configured correctly',
+    'o driver pode estar danificado':
+        'the driver may be damaged',
+    'não consegue arrancar':
+        'cannot start',
+    'não tem recursos livres':
+        'has no free resources',
+    'o driver precisa de ser reinstalado':
+        'the driver needs to be reinstalled',
+    'configuração danificada no registo':
+        'damaged configuration in the registry',
+    'sem driver instalado':
+        'no driver installed',
+    'o Windows não consegue carregar o driver':
+        "Windows can't load the driver",
+    'o driver não arrancou':
+        "the driver didn't start",
+    'o driver está danificado ou em falta':
+        'the driver is damaged or missing',
+    'o Windows parou o dispositivo porque reportou problemas':
+        'Windows stopped the device because it reported problems',
+    'a assinatura do driver não foi verificada':
+        "the driver signature couldn't be verified",
+    'erro':
+        'error',
+    'Dispositivo desconhecido':
+        'Unknown device',
+    'A Steam e muitos jogos pelo Proton são de 32 bits: sem este pacote podem não abrir ou abrir sem aceleração.':
+        'Steam and many Proton games are 32-bit: without this package they may not start, or start without acceleration.',
+    'A Steam e muitos jogos pelo Proton são de 32 bits: sem este pacote podem não abrir ou abrir sem aceleração. Antes, é preciso ativar a arquitetura i386 (comando abaixo).':
+        'Steam and many Proton games are 32-bit: without this package they may not start, or start without acceleration. First you need to enable the i386 architecture (command below).',
+    'Nada para instalar.':
+        'Nothing to install.',
+    'o driver livre nouveau':
+        'the open-source nouveau driver',
+    'nenhum driver':
+        'no driver',
+    'Com o nouveau, as placas NVIDIA recentes ficam presas a velocidades baixas e quase não correm jogos. Instale o driver da NVIDIA com o comando abaixo e reinicie.':
+        'With nouveau, recent NVIDIA cards are stuck at low clocks and can barely run games. Install the NVIDIA driver with the command below and restart.',
+    'Com o nouveau, as placas NVIDIA recentes ficam presas a velocidades baixas e quase não correm jogos. Instale o driver da NVIDIA pelo gestor de drivers da sua distribuição e reinicie.':
+        "With nouveau, recent NVIDIA cards are stuck at low clocks and can barely run games. Install the NVIDIA driver with your distribution's driver manager and restart.",
+    'São correções do fabricante carregadas a cada arranque (estabilidade e segurança). Depois de instalar, reinicie; com o GRUB pode ser preciso regenerar a configuração (grub-mkconfig).':
+        'These are fixes from the manufacturer loaded at every boot (stability and security). Restart after installing; with GRUB you may need to regenerate its configuration (grub-mkconfig).',
+    'A placa gráfica está sem driver':
+        'The graphics card has no driver',
+    'O Windows está a usar o «Adaptador de Vídeo Básico da Microsoft»: sem aceleração, resolução e frequência limitadas, jogos não abrem. Instale o driver da AMD, NVIDIA ou Intel (página Atualizações → Drivers) ou procure em Windows Update → Opções avançadas → Atualizações opcionais.':
+        'Windows is using the "Microsoft Basic Display Adapter": no acceleration, limited resolution and refresh rate, games won\'t start. Install the AMD, NVIDIA or Intel driver (Updates page → Drivers) or look in Windows Update → Advanced options → Optional updates.',
+    'Sem ele, o Proton/DXVK e muitos jogos e programas recentes não abrem ou usam a CPU para desenhar.':
+        "Without it, Proton/DXVK and many recent games and programs won't start or fall back to drawing on the CPU.",
+    'Versão instalada e se há uma mais recente (Linux: Mesa ou NVIDIA; Windows: driver do fabricante) e o que falta para os jogos e o sistema funcionarem bem.':
+        "Installed version and whether a newer one exists (Linux: Mesa or NVIDIA; Windows: manufacturer driver), and what's missing for games and the system to work well.",
+    'A procurar drivers e componentes em falta…':
+        'Looking for missing drivers and components…',
+    'Instalar o que falta':
+        "Install what's missing",
+    'Abrir o Gestor de Dispositivos':
+        'Open Device Manager',
+    'Nada em falta':
+        'Nothing missing',
+    'Todos os dispositivos têm driver.':
+        'Every device has a driver.',
+    'Driver Vulkan, 32 bits para a Steam e microcode — está tudo instalado.':
+        'Vulkan driver, 32-bit for Steam and microcode — everything is installed.',
 }
 
 TEMPLATES_MORE: dict[str, str] = {
@@ -3358,4 +3423,29 @@ TEMPLATES_MORE: dict[str, str] = {
         "Memory is running at {} MT/s, below the {} MT/s the modules support. Check the memory settings in the BIOS.",
     "Memória a {} MT/s. Atenção: os módulos não são todos iguais — kits misturados às vezes obrigam a baixar a velocidade.":
         "Memory at {} MT/s. Note: the modules aren't all the same — mixed kits sometimes force a lower speed.",
+    # 2.3 — drivers e componentes em falta
+    'Instalado: {}. Reinicie o PC para ter a certeza de que é usado.':
+        "Installed: {}. Restart the PC to make sure it's used.",
+    'Gestor de pacotes não reconhecido — instale à mão: {}':
+        'Package manager not recognised — install manually: {}',
+    'Falta o microcode da CPU {}':
+        'The {} CPU microcode is missing',
+    '{} dispositivo(s) com problema no Gestor de Dispositivos':
+        '{} device(s) with problems in Device Manager',
+    '{}. Os dispositivos sem driver costumam resolver-se em Windows Update → Atualizações opcionais ou no site do fabricante da placa-mãe/portátil.':
+        "{}. Devices without a driver are usually fixed in Windows Update → Optional updates or on the motherboard/laptop manufacturer's website.",
+    'Falta o driver Vulkan da placa {}':
+        "The {} graphics card's Vulkan driver is missing",
+    'Falta o driver Vulkan de 32 bits ({}) para a Steam':
+        'The 32-bit Vulkan driver ({}) for Steam is missing',
+    'A placa {} está a usar {}':
+        'The {} card is using {}',
+    'Instalar {}? O sistema vai pedir a palavra-passe.':
+        'Install {}? The system will ask for your password.',
+    'Instala: {}':
+        'Installs: {}',
+    'Não foi possível verificar os componentes: {}':
+        "Couldn't check the components: {}",
+    '{} (+{}).':
+        '{} (+{}).',
 }

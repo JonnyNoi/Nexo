@@ -76,7 +76,8 @@ class UpdatesPage(Page):
         self.add(lst, 1)
 
         drv = Card("Drivers da placa gráfica", "Versão instalada e se há uma mais recente (Linux: Mesa ou NVIDIA; "
-                   "Windows: driver do fabricante).", icon="gauge")
+                   "Windows: driver do fabricante) e o que falta para os jogos e o sistema funcionarem bem.",
+                   icon="gauge")
         self.btn_drv = QPushButton("Verificar")
         self.btn_drv.clicked.connect(self.check_drivers)
         drv.head.addWidget(self.btn_drv)
@@ -84,7 +85,17 @@ class UpdatesPage(Page):
         self.drv_body.setTextFormat(Qt.RichText)
         self.drv_body.setOpenExternalLinks(True)
         drv.add(self.drv_body)
+        drv.add(separator())
+        self.comp_body = label("", "", wrap=True)
+        self.comp_body.setTextFormat(Qt.RichText)
+        self.btn_comp = QPushButton("Abrir o Gestor de Dispositivos" if IS_WIN else "Instalar o que falta")
+        self.btn_comp.setObjectName("Primary")
+        self.btn_comp.clicked.connect(self._fix_components)
+        self.btn_comp.hide()
+        drv.add(self.comp_body)
+        drv.add(hbox(None, self.btn_comp))
         self.add(drv)
+        self._components: list = []
         self._drv_checked = False
 
         self.items: list[up.Update] = []
@@ -118,6 +129,64 @@ class UpdatesPage(Page):
             self.btn_drv.setEnabled(True)
             self.drv_body.setText(f"Não foi possível verificar: {m}")
         run_async(drivers.check, online, on_done=done, on_fail=fail)
+        self.check_components()
+
+    # ------------------------------------------------------------------ componentes em falta
+    def check_components(self):
+        from ...core import components
+        self.comp_body.setText("A procurar drivers e componentes em falta…")
+        run_async(components.check, on_done=self._show_components,
+                  on_fail=lambda m: self.comp_body.setText(f"Não foi possível verificar os componentes: {m}"))
+
+    def _show_components(self, found: list):
+        self._components = found
+        from html import escape
+
+        from ...core.i18n import tr
+        if not found:
+            why = ("Todos os dispositivos têm driver." if IS_WIN else
+                   "Driver Vulkan, 32 bits para a Steam e microcode — está tudo instalado.")
+            self.comp_body.setText(f"{status_dot('ok')} <b>{tr('Nada em falta')}</b><br>"
+                                   f"<span style='color:{theme.C['muted']}'>{tr(why)}</span>")
+            self.btn_comp.hide()
+            return
+        rows = []
+        for f in found:   # nomes de dispositivos vêm do sistema: escapar antes de pôr em HTML
+            cmd = f"<br><code>{escape(f.command)}</code>" if f.command else ""
+            rows.append(f"{status_dot(f.kind)} <b>{escape(tr(f.title))}</b><br>"
+                        f"<span style='color:{theme.C['muted']}'>{escape(tr(f.detail))}</span>{cmd}")
+        self.comp_body.setText("<br><br>".join(rows))
+        fixable = [f for f in found if f.action == ("devmgmt" if IS_WIN else "install")]
+        if not IS_WIN and fixable:
+            pkgs = ", ".join(dict.fromkeys(p for f in fixable for p in f.packages))
+            self.btn_comp.setToolTip(f"Instala: {pkgs}")
+        self.btn_comp.setVisible(bool(fixable))
+
+    def _fix_components(self):
+        from ...core import components
+        if IS_WIN:
+            components.open_device_manager()
+            return
+        todo = [f for f in self._components if f.action == "install"]
+        pkgs = ", ".join(dict.fromkeys(p for f in todo for p in f.packages))
+        if QMessageBox.question(self, "Instalar o que falta",
+                                f"Instalar {pkgs}? O sistema vai pedir a palavra-passe.") != QMessageBox.Yes:
+            return
+        self.btn_comp.setEnabled(False)
+        self.btn_comp.setText("A instalar…")
+
+        def done(res):
+            ok, msg = res
+            self.btn_comp.setEnabled(True)
+            self.btn_comp.setText("Instalar o que falta")
+            notify(msg, "ok" if ok else "bad")
+            self.check_components()
+
+        def fail(m):
+            self.btn_comp.setEnabled(True)
+            self.btn_comp.setText("Instalar o que falta")
+            notify(f"Não foi possível instalar: {m}", "bad")
+        run_async(components.install, todo, on_done=done, on_fail=fail)
 
     def on_show(self):
         if not self._drv_checked:

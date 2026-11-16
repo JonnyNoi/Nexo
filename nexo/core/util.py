@@ -18,7 +18,7 @@ LEGACY_NAME = "PCForge"  # nome antigo (para migrar definições)
 APP_VERSION = "2.3"
 # repositório GitHub ("dono/nome") de onde o Nexo procura versões novas (releases com os ficheiros
 # "Nexo" e "Nexo.exe"). Vazio = sem verificação de atualizações do próprio Nexo.
-UPDATE_REPO = ""
+UPDATE_REPO = "JonnyNoi/Nexo"
 
 
 class TaskCancelled(Exception):
