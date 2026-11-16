@@ -1,0 +1,55 @@
+# Pacote do Nexo para o AUR (código da etiqueta do GitHub).
+# Não editar à mão: `sh packaging/aur/atualizar.sh` preenche _repo, pkgver e sha256sums a partir de
+# UPDATE_REPO/APP_VERSION (nexo/core/util.py) e gera o .SRCINFO. Ver packaging/aur/LEIA-ME.md.
+_repo=@REPO@
+pkgname=nexo
+pkgver=@VERSAO@
+pkgrel=1
+pkgdesc="Utilitário do PC: sensores, saúde dos discos, otimização, modo jogo, limpeza, antivírus e benchmarks"
+arch=('any')
+url="https://github.com/$_repo"
+license=('custom')
+depends=('python' 'pyside6' 'python-psutil' 'polkit')
+optdepends=('smartmontools: saúde dos discos (S.M.A.R.T.)'
+            'pacman-contrib: lista de atualizações sem sincronizar a base de dados (checkupdates)'
+            'mangohud: contador de FPS no modo jogo'
+            'clamav: antivírus'
+            'flatpak: instalar aplicações'
+            'snapper: pontos de restauro antes de alterar o sistema'
+            'gamemode: Feral GameMode nos perfis por jogo'
+            'networkmanager: análise do Wi-Fi')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/$_repo/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('@SHA256@')
+
+package() {
+    cd "$srcdir/${_repo##*/}-$pkgver"
+    local site
+    site=$(python -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
+    install -d "$pkgdir$site"
+    cp -r nexo "$pkgdir$site/"
+    find "$pkgdir$site/nexo" -name '__pycache__' -prune -exec rm -rf {} +
+    python -m compileall -q -d "$site/nexo" "$pkgdir$site/nexo"
+
+    install -Dm755 /dev/stdin "$pkgdir/usr/bin/nexo" <<'SH'
+#!/bin/sh
+exec python -m nexo "$@"
+SH
+    install -Dm644 assets/nexo.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/nexo.png"
+    install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/nexo.desktop" <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Nexo
+GenericName=Utilitário do PC
+Comment=Sensores, saúde dos discos, otimização, modo jogo e benchmarks
+Exec=nexo
+Icon=nexo
+Categories=System;Monitor;Utility;
+Keywords=sensores;temperatura;otimizar;limpeza;benchmark;jogos;
+Terminal=false
+StartupWMClass=Nexo
+DESKTOP
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+    if [ -f LICENSE ]; then
+        install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    fi
+}

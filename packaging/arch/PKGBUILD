@@ -3,7 +3,7 @@
 pkgname=nexo
 pkgver=2.3
 pkgrel=1
-pkgdesc="Utilitário do PC: sensores, saúde dos discos, otimização, modo jogo, ventoinhas, limpeza e benchmarks"
+pkgdesc="Utilitário do PC: sensores, saúde dos discos, otimização, modo jogo, limpeza, antivírus e benchmarks"
 arch=('any')
 url="https://github.com/"
 license=('custom')

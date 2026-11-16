@@ -16,7 +16,7 @@ from functools import lru_cache
 
 from .util import get_setting
 
-LANGS = {"pt": "Português", "en": "English (beta)"}
+LANGS = {"pt": "Português", "en": "English"}
 _lang: str | None = None
 
 
