@@ -308,6 +308,25 @@ class Weekly(TempConfig):
 
 
 class Cli(TempConfig):
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(self._close_logs)
+
+    @staticmethod
+    def _close_logs():
+        import faulthandler
+        import logging
+
+        from nexo.core import log as nlog
+        faulthandler.disable()
+        if nlog._crash_file:
+            nlog._crash_file.close()
+            nlog._crash_file = None
+        root = logging.getLogger()
+        for h in [h for h in root.handlers if getattr(h, "_nexo", False)]:
+            root.removeHandler(h)
+            h.close()
+
     def _run(self, *args) -> tuple[int, str]:
         from nexo import cli
         buf = io.StringIO()

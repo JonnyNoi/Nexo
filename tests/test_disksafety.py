@@ -2,6 +2,7 @@
 
 Executar:  .venv/bin/python -m unittest discover -s tests -t .
 """
+import os
 import unittest
 
 from nexo.core import disksafety as d
@@ -32,6 +33,8 @@ class Classify(unittest.TestCase):
     def test_levels(self):
         for level, paths in CASES.items():
             for p in paths:
+                if os.name == "nt" and p.startswith("/"):
+                    continue   # as regras de ~ no Windows apontam para C:\\Users
                 with self.subTest(path=p):
                     self.assertEqual(d.classify(p).level, level)
 

@@ -205,7 +205,7 @@ class CleanupSafety(TempConfig):
         (d / "f").write_text("x")
         cat = cleanup.CleanCategory("t", "T", "", [str(d / "*")], needs_admin=True)
         with mock.patch.object(cleanup, "run_root", return_value=(0, "")) as rr, \
-                mock.patch.object(cleanup, "IS_LINUX", True), mock.patch("os.geteuid", return_value=1000):
+                mock.patch.object(cleanup, "IS_LINUX", True), mock.patch("os.geteuid", return_value=1000, create=True):
             cleanup.clean(cat)
         cmd = rr.call_args[0][0]
         self.assertEqual(cmd[:3], ["rm", "-rf", "--"])   # lista de argumentos: sem shell, sem citações
@@ -292,7 +292,8 @@ class DiskScan(unittest.TestCase):
             Path(root, "a.bin").write_bytes(os.urandom(12 * mb))
             Path(root, "sub", "b.txt").write_bytes(dup)
             Path(root, "sub", "c.txt").write_bytes(dup)   # duplicado de b.txt
-            res = diskscan.scan(root, find_duplicates=False, collect_duplicates=True)  # como a página
+            with mock.patch.object(diskscan, "_DUP_EXCLUDE", ()):   # no Windows o Temp está excluído
+                res = diskscan.scan(root, find_duplicates=False, collect_duplicates=True)  # como a página
             dups = diskscan.find_duplicates(res)
         self.assertEqual(res.files, 3)
         self.assertEqual(res.total, 30 * mb)

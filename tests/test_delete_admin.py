@@ -11,6 +11,7 @@ from unittest import mock
 from nexo.core import util
 
 
+@unittest.skipIf(os.name == "nt", "testa o caminho do Linux (pkexec, regras de caminhos POSIX)")
 class DeleteAsAdmin(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -97,7 +98,7 @@ class RunRoot(unittest.TestCase):
     """run_root com lista: vai ao pkexec com o caminho absoluto do programa e sem passar pelo shell."""
 
     def _call(self, cmd):
-        with mock.patch.object(util, "IS_WIN", False), mock.patch("os.geteuid", return_value=1000), \
+        with mock.patch.object(util, "IS_WIN", False), mock.patch("os.geteuid", return_value=1000, create=True), \
                 mock.patch.object(util, "which", lambda n: f"/usr/bin/{n}"), \
                 mock.patch.object(util, "run", return_value=(0, "")) as run:
             util.run_root(cmd)
