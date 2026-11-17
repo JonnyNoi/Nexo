@@ -12,7 +12,7 @@ from ..widgets import Card, Page, label, notify, run_async
 
 class SystemPage(Page):
     def __init__(self):
-        super().__init__("Informação do sistema", "Sistema operativo, processador, memória, placa gráfica, placa-mãe, discos e rede")
+        super().__init__("Informação do sistema", "Sistema operativo, processador, memória, placa gráfica, ecrã, placa-mãe, discos e rede")
         self.data: dict = {}
         self.btn_refresh = QPushButton("Atualizar")
         self.btn_export = QPushButton("Exportar relatório")

@@ -2860,6 +2860,8 @@ EN_MORE: dict[str, str] = {
         'Every device has a driver.',
     'Driver Vulkan, 32 bits para a Steam e microcode — está tudo instalado.':
         'Vulkan driver, 32-bit for Steam and microcode — everything is installed.',
+    "Ecrã": "Display",
+    "Monitor": "Monitor",
 }
 
 TEMPLATES_MORE: dict[str, str] = {
@@ -3448,4 +3450,18 @@ TEMPLATES_MORE: dict[str, str] = {
         "Couldn't check the components: {}",
     '{} (+{}).':
         '{} (+{}).',
+    # 2.3 — monitor abaixo da taxa de atualização
+    'O monitor está a {} Hz mas aceita {} Hz. Escolha {} Hz nas definições de ecrã do sistema — se não aparecer, use um cabo DisplayPort ou HDMI 2.0/2.1.':
+        "The monitor is running at {} Hz but supports {} Hz. Pick {} Hz in the system's display settings — if it isn't listed, use a DisplayPort or HDMI 2.0/2.1 cable.",
+    '{} a {} Hz. A resolução nativa é {}×{} — abaixo dela a imagem fica menos nítida.':
+        '{} at {} Hz. The native resolution is {}×{} — below it the image is less sharp.',
+    '{} a {} Hz — o máximo que o monitor aceita.':
+        '{} at {} Hz — the most the monitor supports.',
+    '{} a {} Hz.':
+        '{} at {} Hz.',
+    # (fim dos modelos do monitor)
+    'Até {} Hz':
+        'Up to {} Hz',
+    'Monitor a {} Hz em vez de {} Hz — mude nas definições de ecrã.':
+        'Monitor at {} Hz instead of {} Hz — change it in the display settings.',
 }

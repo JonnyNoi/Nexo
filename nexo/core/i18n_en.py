@@ -27,8 +27,8 @@ EN: dict[str, str] = {
     # ------------------------------------------------------------------ títulos e subtítulos das páginas
     "Estado do PC em tempo real": "Your PC's status in real time",
     "Informação do sistema": "System information",
-    "Sistema operativo, processador, memória, placa gráfica, placa-mãe, discos e rede":
-        "Operating system, processor, memory, graphics card, motherboard, disks and network",
+    "Sistema operativo, processador, memória, placa gráfica, ecrã, placa-mãe, discos e rede":
+        "Operating system, processor, memory, graphics card, display, motherboard, disks and network",
     "Como estão as peças do PC agora — atualizado a cada segundo": "How your PC's parts are doing — updated every second",
     "As aplicações abertas e quanto estão a gastar — feche as que estão a pesar":
         "Open apps and how much they use — close the heavy ones",

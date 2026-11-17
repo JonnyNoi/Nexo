@@ -53,7 +53,7 @@ class BackgroundMixin:
         self._rel_timer.timeout.connect(self._reliability_check)
         self._rel_timer.start(6 * 3600_000)
         QTimer.singleShot(60_000, self._reliability_check)
-        # tempo de arranque, velocidade da RAM e bateria (caches para a Saúde do PC); relatório da semana
+        # tempo de arranque, velocidade da RAM, monitores e bateria (caches para a Saúde do PC); relatório da semana
         QTimer.singleShot(40_000, self._daily_probes)
         self._probe_timer = QTimer(self)
         self._probe_timer.timeout.connect(self._daily_probes)
@@ -70,9 +70,19 @@ class BackgroundMixin:
         if getattr(self, "game", None) is not None:
             return
 
+        from ..core import display
+        try:   # Hz visto pelo Qt (na thread da interface) para quando não há ferramenta do compositor
+            from PySide6.QtGui import QGuiApplication
+            display.set_qt_screens([{"name": s.name(), "model": s.model(), "hz": s.refreshRate(),
+                                     "width": round(s.size().width() * s.devicePixelRatio()),
+                                     "height": round(s.size().height() * s.devicePixelRatio())}
+                                    for s in QGuiApplication.screens()])
+        except Exception:  # noqa: BLE001
+            pass
+
         def work():
             from ..core import battery, boottime, ramspeed, weekly
-            for fn in (boottime.record, ramspeed.modules, battery.batteries):
+            for fn in (boottime.record, ramspeed.modules, battery.batteries, display.monitors):
                 try:
                     fn()
                 except Exception:  # noqa: BLE001 — uma sonda falhada não impede as outras

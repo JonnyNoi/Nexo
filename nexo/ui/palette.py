@@ -30,6 +30,7 @@ FEATURES: dict[str, list[tuple[str, str]]] = {
                    ("Processador", "cpu caches instruções"),
                    ("Memória", "ram módulos slots velocidade xmp expo docp mhz mt/s lenta"),
                    ("Placa gráfica", "gpu vram pcie vbios opengl vulkan driver"),
+                   ("Ecrã", "monitor hz taxa de atualização refresh rate 144 165 240 resolução nativa"),
                    ("Placa-mãe", "motherboard bios uefi secure boot"), ("Discos", "ssd nvme hdd"),
                    ("Rede", "ip mac wifi ethernet")],
     "Sensores": [("Simples", "resumo temperatura processador placa gráfica quente normal"),

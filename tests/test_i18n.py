@@ -66,11 +66,11 @@ class Catalogue(unittest.TestCase):
         root = Path(__file__).resolve().parent.parent / "nexo"
         files = [root / f for f in ("ui/pages/battery.py", "ui/pages/programs.py", "ui/boot_card.py",
                                     "ui/wifi_card.py", "ui/weekly_dialog.py", "core/weekly.py", "core/boottime.py",
-                                    "core/battery.py", "core/ramspeed.py", "core/wifi.py")]
+                                    "core/battery.py", "core/ramspeed.py", "core/wifi.py", "core/display.py")]
         pt = re.compile(r"[ãõçáéíóúâêô]|\b(de|do|da|em|não|para|com|que|os|as)\b", re.I)
         todo = [s for s in missing(_scan(files)) if pt.search(s) and "{{" not in s and "\\" not in s]
         # palavras-chave internas (não aparecem no ecrã)
-        todo = [s for s in todo if s != "taxa de rece"]
+        todo = [s for s in todo if s not in ("taxa de rece", "monitor genérico")]
         self.assertEqual(todo, [])
 
     def test_menu_is_translated(self):

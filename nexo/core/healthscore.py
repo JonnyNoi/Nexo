@@ -62,6 +62,7 @@ def slow_checks(now: float | None = None) -> list[Check]:
     out += _throttling(now)
     out += _battery()
     out += _memory_speed()
+    out += _display()
     out += _boot()
     return out
 
@@ -84,6 +85,16 @@ def _memory_speed() -> list[Check]:
         what = f"{v.current} MT/s em vez de {v.rated}" if v.rated else f"{v.current} MT/s"
         return [Check("warn", f"Memória RAM abaixo da velocidade ({what}) — ligue o XMP/EXPO no BIOS.",
                       "Informação", "Ver")]
+    return []
+
+
+def _display() -> list[Check]:
+    from . import display
+    for m in display.cached():
+        v = display.check(m)
+        if v and v.kind == "warn":
+            return [Check("warn", f"Monitor a {m.hz:.0f} Hz em vez de {m.max_hz:.0f} Hz — mude nas definições de ecrã.",
+                          "Informação", "Ver")]
     return []
 
 

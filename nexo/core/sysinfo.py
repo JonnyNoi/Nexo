@@ -257,6 +257,23 @@ def _ram_speed_rows(wmi: dict | None) -> Section:
     return rows
 
 
+def _display_section() -> Section:
+    """Monitores: modo atual e se está abaixo da taxa de atualização máxima (144 Hz a correr a 60 Hz)."""
+    from . import display
+    try:
+        mons = display.monitors()
+    except Exception:  # noqa: BLE001
+        return []
+    rows: Section = []
+    for m in mons:
+        v = display.check(m)
+        if v:
+            rows.append((m.label, ("⚠ " if v.kind == "warn" else "") + v.text))
+        elif m.max_hz:
+            rows.append((m.label, f"Até {m.max_hz:.0f} Hz"))
+    return rows
+
+
 # =========================================================================== Placa-mãe
 def _board_section_linux() -> Section:
     d = "/sys/class/dmi/id/"
@@ -413,6 +430,13 @@ def _wmi() -> dict:
 # =========================================================================== API pública
 def collect() -> dict[str, Section]:
     """Devolve um dicionário ordenado {categoria: [(campo, valor), ...]}. Pode demorar alguns segundos."""
+    data = _collect()
+    if not data.get("Ecrã"):   # VM, sessão remota ou sem forma de ler os monitores
+        data.pop("Ecrã", None)
+    return data
+
+
+def _collect() -> dict[str, Section]:
     if IS_WIN:
         w = _wmi()
         return {
@@ -420,6 +444,7 @@ def collect() -> dict[str, Section]:
             "Processador": _cpu_section_win(w),
             "Memória": _ram_section(w),
             "Placa gráfica": _gpu_section_win(w),
+            "Ecrã": _display_section(),
             "Placa-mãe / BIOS": _board_section_win(w),
             "Armazenamento": _disk_section(w),
             "Rede": _net_section(),
@@ -429,6 +454,7 @@ def collect() -> dict[str, Section]:
         "Processador": _cpu_section_linux(),
         "Memória": _ram_section(),
         "Placa gráfica": _gpu_section_linux(),
+        "Ecrã": _display_section(),
         "Placa-mãe / BIOS": _board_section_linux(),
         "Armazenamento": _disk_section(),
         "Rede": _net_section(),
