@@ -250,6 +250,9 @@ class InternetPage(Page):
         from ..wifi_card import WifiCard
         self.wifi = WifiCard()
         self.add(self.wifi)
+        from ..firewall_card import FirewallCard
+        self.firewall = FirewallCard()
+        self.add(self.firewall)
         self._wifi_loaded = False
         monitor().checked.connect(self._show_net)
         if monitor().status is not None:
@@ -318,6 +321,7 @@ class InternetPage(Page):
         if not self._wifi_loaded:
             self._wifi_loaded = True
             self.wifi.load()
+            self.firewall.load()
         self._np_tick()
         self.np_timer.start(2000)
 

@@ -66,6 +66,14 @@ def _page_factories(hub, on_settings):
         from .pages.startup import StartupPage
         return StartupPage()
 
+    def peripherals():
+        from .pages.peripherals import PeripheralsPage
+        return PeripheralsPage()
+
+    def privacy():
+        from .pages.privacy import PrivacyPage
+        return PrivacyPage()
+
     def debloat():
         from .pages.debloat import DebloatPage
         return DebloatPage()
@@ -119,6 +127,8 @@ def _page_factories(hub, on_settings):
     opt = [("Otimização", "zap", optimize), ("Arranque", "power", startup)]
     if IS_WIN:
         opt.append(("Windows debloat", "broom", debloat))
+    else:
+        opt.append(("Privacidade", "shield", privacy))
     from ..core import battery as _bat
     try:
         has_bat = _bat.has_battery()
@@ -127,6 +137,7 @@ def _page_factories(hub, on_settings):
     sysitems = [("Informação", "info", system), ("Sensores", "thermo", sensors)]
     if has_bat:
         sysitems.append(("Bateria", "battery", battery))
+    sysitems.append(("Periféricos", "keyboard", peripherals))
     return [
         (None, [("Visão geral", "home", dashboard)]),
         ("SISTEMA", [*sysitems,

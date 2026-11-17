@@ -14,6 +14,10 @@ def main() -> int:
         nlog.setup("gpubench")  # benchmark da placa gráfica (processo à parte, ver core/gpubench.py)
         from .core.gpubench import main_from_argv
         return main_from_argv(sys.argv)
+    if "--gpustress" in sys.argv:
+        nlog.setup("gpustress")  # stress test da placa gráfica e da VRAM (processo à parte, ver core/gpustress.py)
+        from .core.gpustress import main_from_argv as gpustress_main
+        return gpustress_main(sys.argv)
     if "--overlay" in sys.argv:
         nlog.setup("overlay")  # processo do overlay de jogo (lançado pela janela principal)
         from .ui.overlay import run

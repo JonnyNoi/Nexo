@@ -63,6 +63,7 @@ def slow_checks(now: float | None = None) -> list[Check]:
     out += _battery()
     out += _memory_speed()
     out += _display()
+    out += _firewall()
     out += _boot()
     return out
 
@@ -96,6 +97,19 @@ def _display() -> list[Check]:
             return [Check("warn", f"Monitor a {m.hz:.0f} Hz em vez de {m.max_hz:.0f} Hz — mude nas definições de ecrã.",
                           "Informação", "Ver")]
     return []
+
+
+def _firewall() -> list[Check]:
+    from . import firewall
+    st, ports = firewall.cached()
+    if st is None or st.active is not False:
+        return []
+    worst = next((f for f in firewall.analyze(st, ports) if f[0] in ("bad", "warn")), None)
+    if worst is None:
+        return []
+    return [Check(worst[0], "Firewall desligada — o PC aceita ligações de outros aparelhos da rede."
+                  if worst[0] == "bad" or any(p.exposed for p in ports) else "Firewall desligada.",
+                  "Internet", "Ver")]
 
 
 def _boot() -> list[Check]:

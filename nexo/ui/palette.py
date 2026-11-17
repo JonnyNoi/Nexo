@@ -65,6 +65,8 @@ FEATURES: dict[str, list[tuple[str, str]]] = {
                  ("O que a sua ligação permite", "4k streaming chamadas jogos online qualidade"),
                  ("Ligação à internet", "rede wifi cabo offline sem internet router portal diagnóstico"),
                  ("Wi-Fi", "wifi sinal fraco canal interferência 2,4 ghz 5 ghz router redes vizinhas"),
+                 ("Firewall e portas abertas", "firewall ufw firewalld portas abertas segurança rede ligações "
+                                               "ssh samba exposto"),
                  ("Histórico", "testes anteriores")],
     "Instalar aplicações": [("Instalar", "programas apps winget flatpak flathub navegador jogos steam discord "
                                          "vlc obs spotify chrome firefox"),
@@ -84,6 +86,12 @@ FEATURES: dict[str, list[tuple[str, str]]] = {
     "Bateria": [("Bateria", "portátil laptop saúde desgaste ciclos capacidade autonomia carga battery")],
     "Programas instalados": [("Desinstalar", "remover apagar programas instalados uninstall adicionar remover "
                                              "pacotes tamanho espaço")],
+    "Periféricos": [("Bluetooth", "bluetooth adaptador ligado aparelhos emparelhados"),
+                    ("Bateria dos aparelhos sem fios", "bateria rato teclado comando auscultadores headset logitech "
+                                                       "dualsense xbox sem fios carregar")],
+    "Privacidade": [("Recolha de dados", "privacidade telemetria estatísticas relatórios de erros apport abrt "
+                                         "pkgstats popcon localização kuserfeedback recentes"),
+                    ("Histórico de ficheiros recentes", "apagar recentes histórico documentos abertos")],
     "Windows debloat": [("Apps pré-instaladas", "remover bloatware candy crush tiktok cortana copilot clipchamp"),
                         ("Telemetria", "privacidade publicidade recall bing widgets anúncios sugestões"),
                         ("Restaurar originais", "reverter")],

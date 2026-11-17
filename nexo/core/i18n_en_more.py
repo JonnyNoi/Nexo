@@ -2862,6 +2862,212 @@ EN_MORE: dict[str, str] = {
         'Vulkan driver, 32-bit for Steam and microcode — everything is installed.',
     "Ecrã": "Display",
     "Monitor": "Monitor",
+    'A placa não aceitou as imagens fora do ecrã.':
+        "The card didn't accept the off-screen images.",
+    'Não foi possível reservar memória de vídeo — só a carga da placa é testada.':
+        "Couldn't reserve video memory — only the card's load is tested.",
+    'O teste da VRAM não é fiável neste driver — só a carga da placa é testada.':
+        "The VRAM test isn't reliable on this driver — only the card's load is tested.",
+    'Carga máxima na CPU (todos os threads), teste de RAM e/ou placa gráfica com teste da VRAM, com verificação de erros. Pára sozinho ao atingir o limite de temperatura.':
+        'Full load on the CPU (all threads), RAM test and/or graphics card with a VRAM test, with error checking. Stops by itself at the temperature limit.',
+    'Placa gráfica + VRAM':
+        'Graphics card + VRAM',
+    'Parar se a GPU passar de':
+        'Stop if the GPU goes above',
+    'Escolha CPU, RAM e/ou placa gráfica.':
+        'Choose CPU, RAM and/or graphics card.',
+    'O teste da placa gráfica terminou':
+        'The graphics card test finished',
+    'Não foi possível ler a temperatura da placa gráfica, por isso o limite de segurança da GPU não vai funcionar.\nContinuar mesmo assim?':
+        "Couldn't read the graphics card temperature, so the GPU safety limit won't work.\nContinue anyway?",
+    'VRAM: verificador confirmado (deteta erros de propósito)':
+        'VRAM: checker confirmed (detects deliberate errors)',
+    '✘ Placa gráfica: ':
+        '✘ Graphics card: ',
+    'Temperaturas e carga (últimos 5 min)':
+        'Temperatures and load (last 5 min)',
+    'RPC do Windows':
+        'Windows RPC',
+    'Partilha de ficheiros (SMB)':
+        'File sharing (SMB)',
+    'Docker (sem cifra)':
+        'Docker (unencrypted)',
+    'Servidor de desenvolvimento':
+        'Development server',
+    'Ambiente de Trabalho Remoto':
+        'Remote Desktop',
+    'mDNS (descoberta na rede)':
+        'mDNS (network discovery)',
+    'Servidor web':
+        'Web server',
+    'Painel web':
+        'Web panel',
+    'DHCP (servidor)':
+        'DHCP (server)',
+    'Impressoras (CUPS)':
+        'Printers (CUPS)',
+    'Nenhuma firewall instalada.':
+        'No firewall installed.',
+    'Firewall do Windows':
+        'Windows Firewall',
+    'Regras próprias (/etc/nftables.conf).':
+        'Custom rules (/etc/nftables.conf).',
+    'Instalada mas desligada.':
+        'Installed but turned off.',
+    'Gestor de pacotes não reconhecido — instale o ufw ou o firewalld à mão.':
+        'Package manager not recognised — install ufw or firewalld manually.',
+    'Firewall instalada e ligada.':
+        'Firewall installed and turned on.',
+    'Ligada em todos os perfis':
+        'On in all profiles',
+    'Bloqueia ligações que chegam de fora, exceto as que autorizou.':
+        'Blocks incoming connections, except the ones you allowed.',
+    'Zona ativa com as regras da distribuição.':
+        "Active zone with the distribution's rules.",
+    'A API do Docker está aberta na rede sem cifra (porta 2375) — dá controlo total do PC a quem lá chegar.':
+        'The Docker API is open on the network without encryption (port 2375) — it gives full control of the PC to anyone who reaches it.',
+    'Nenhum serviço aceita ligações de outros aparelhos — só do próprio PC.':
+        'No service accepts connections from other devices — only from this PC.',
+    'É preciso abrir o Nexo como administrador (botão Admin no menu).':
+        'Nexo needs to be opened as administrator (Admin button in the menu).',
+    'Firewall do Windows ligada.':
+        'Windows Firewall turned on.',
+    'ufw ligada: bloqueia as ligações que chegam de fora.':
+        'ufw turned on: it blocks incoming connections.',
+    'firewalld ligada.':
+        'firewalld turned on.',
+    'Firewall e portas abertas':
+        'Firewall and open ports',
+    'Se o PC aceita ligações de outros aparelhos da rede e que programas estão à espera delas.':
+        'Whether the PC accepts connections from other devices on the network and which programs are waiting for them.',
+    'Abertas para a rede':
+        'Open to the network',
+    'Só neste PC':
+        'Only on this PC',
+    'portas só para o próprio PC':
+        'ports only for this PC',
+    'portas (TCP/UDP)':
+        'ports (TCP/UDP)',
+    '\n\nA firewall passa a bloquear as ligações que chegam de fora. Se usar partilha de ficheiros, KDE Connect ou Steam Remote Play pode ter de os autorizar depois.':
+        '\n\nThe firewall will block incoming connections. If you use file sharing, KDE Connect or Steam Remote Play you may have to allow them afterwards.',
+    'não foi possível ler':
+        "couldn't read",
+    'Outros aparelhos da rede':
+        'Other devices on the network',
+    'Só este PC':
+        'Only this PC',
+    'Porta':
+        'Port',
+    'Protocolo':
+        'Protocol',
+    'Serviço':
+        'Service',
+    'Quem pode ligar-se':
+        'Who can connect',
+    '(sistema)':
+        '(system)',
+    'Verificar':
+        'Check',
+    'Ligar a firewall':
+        'Turn on the firewall',
+    'Instalar e ligar a firewall':
+        'Install and turn on the firewall',
+    'Ligada':
+        'On',
+    'Firewall desligada — o PC aceita ligações de outros aparelhos da rede.':
+        'Firewall off — the PC accepts connections from other devices on the network.',
+    'Firewall desligada.':
+        'Firewall off.',
+    'O Debian/Ubuntu deixa de enviar todas as semanas a lista dos pacotes que usa.':
+        'Debian/Ubuntu stops sending the list of packages you use every week.',
+    'Não participar no popularity-contest':
+        "Don't take part in popularity-contest",
+    'Feito (pode ser preciso terminar a sessão)':
+        'Done (you may need to log out)',
+    'Não guardar ficheiros recentes (GNOME)':
+        "Don't keep recent files (GNOME)",
+    'O ambiente de trabalho deixa de registar os ficheiros que abre.':
+        'The desktop stops recording the files you open.',
+    'Não enviar relatórios de problemas nem estatísticas (GNOME)':
+        "Don't send problem reports or statistics (GNOME)",
+    'Desliga o envio automático de relatórios técnicos e estatísticas de uso de software.':
+        'Turns off automatic sending of technical reports and software usage statistics.',
+    'Desligar o serviço de localização (GNOME)':
+        'Turn off location services (GNOME)',
+    'As aplicações deixam de poder pedir a sua localização aproximada.':
+        'Apps can no longer ask for your approximate location.',
+    'Esvaziar lixo e temporários com mais de 30 dias (GNOME)':
+        'Empty trash and temporary files older than 30 days (GNOME)',
+    'Apaga sozinho o que está no lixo e nos temporários há mais de 30 dias.':
+        'Automatically deletes what has been in the trash and temporary files for more than 30 days.',
+    'Não guardar documentos recentes nem o uso de aplicações (KDE)':
+        "Don't keep recent documents or app usage (KDE)",
+    'O Plasma deixa de registar os ficheiros abertos e as aplicações mais usadas (kactivitymanagerd).':
+        'Plasma stops recording opened files and most-used apps (kactivitymanagerd).',
+    'Telemetria do KDE desligada (KUserFeedback)':
+        'KDE telemetry off (KUserFeedback)',
+    'O Plasma não envia estatísticas de utilização. Já vem desligada por omissão — este interruptor garante que fica assim.':
+        "Plasma doesn't send usage statistics. It's off by default — this switch makes sure it stays that way.",
+    'Desligar relatórios de erros da distribuição':
+        "Turn off the distribution's crash reports",
+    'apport/whoopsie (Ubuntu) ou abrt (Fedora): deixam de recolher e enviar dados quando um programa falha.':
+        'apport/whoopsie (Ubuntu) or abrt (Fedora): stop collecting and sending data when a program crashes.',
+    'Não enviar estatísticas de pacotes (pkgstats)':
+        "Don't send package statistics (pkgstats)",
+    'Arch: o pkgstats envia todas as semanas a lista dos pacotes instalados.':
+        'Arch: pkgstats sends the list of installed packages every week.',
+    'Não havia histórico de ficheiros recentes.':
+        'There was no recent files history.',
+    'Histórico de ficheiros recentes apagado (incluindo o do Plasma).':
+        "Recent files history deleted (including Plasma's).",
+    'Histórico de ficheiros recentes apagado.':
+        'Recent files history deleted.',
+    'O Linux não tem a telemetria do Windows, mas o ambiente de trabalho e a distribuição podem guardar histórico ou enviar estatísticas. Tudo reversível.':
+        "Linux doesn't have Windows' telemetry, but the desktop and the distribution can keep history or send statistics. Everything is reversible.",
+    'Recolha de dados':
+        'Data collection',
+    'Só aparece o que existe neste sistema.':
+        'Only what exists on this system is shown.',
+    'Histórico de ficheiros recentes':
+        'Recent files history',
+    'Lista dos ficheiros que abriu, usada pelos menus "Recentes" das aplicações e do ambiente de trabalho.':
+        'List of the files you opened, used by the "Recent" menus of apps and the desktop.',
+    'Não há ficheiros de histórico do GTK/KDE (o Plasma pode ter o seu próprio, que também é apagado).':
+        'There are no GTK/KDE history files (Plasma may have its own, which is also deleted).',
+    'Apagar o histórico de ficheiros recentes? Os ficheiros em si não são tocados — só deixam de aparecer em "Recentes".':
+        'Delete the recent files history? The files themselves aren\'t touched — they just stop showing up in "Recent".',
+    'Nada para ajustar: este sistema não envia telemetria nem estatísticas.':
+        "Nothing to adjust: this system doesn't send telemetry or statistics.",
+    'Mesa digitalizadora':
+        'Drawing tablet',
+    'Leitor multimédia':
+        'Media player',
+    'Comando à distância':
+        'Remote control',
+    'Bateria dos ratos, teclados, comandos e auscultadores sem fios, e estado do Bluetooth. Avisa quando um deles está quase sem bateria.':
+        'Battery of wireless mice, keyboards, controllers and headphones, and Bluetooth status. Warns when one of them is almost out of battery.',
+    'Aparelhos ligados':
+        'Connected devices',
+    'Bateria dos aparelhos sem fios':
+        "Wireless devices' battery",
+    'Não há':
+        'None',
+    'este PC não tem Bluetooth':
+        'this PC has no Bluetooth',
+    'modo de avião ou interruptor do portátil':
+        "airplane mode or the laptop's switch",
+    'Bloqueado':
+        'Blocked',
+    'Adaptador':
+        'Adapter',
+    'a carregar':
+        'charging',
+    'Nenhum aparelho sem fios com bateria encontrado. Ratos e teclados com recetor USB (Logitech, Razer…), comandos e auscultadores Bluetooth aparecem aqui quando estão ligados.':
+        "No wireless devices with a battery found. Mice and keyboards with a USB receiver (Logitech, Razer…), controllers and Bluetooth headphones show up here when they're connected.",
+    'Periféricos':
+        'Peripherals',
+    'Privacidade':
+        'Privacy',
 }
 
 TEMPLATES_MORE: dict[str, str] = {
@@ -3464,4 +3670,49 @@ TEMPLATES_MORE: dict[str, str] = {
         'Up to {} Hz',
     'Monitor a {} Hz em vez de {} Hz — mude nas definições de ecrã.':
         'Monitor at {} Hz instead of {} Hz — change it in the display settings.',
+    # 2.3 — stress da GPU, firewall, privacidade e periféricos
+    'placa gráfica (limite {} °C)':
+        'graphics card (limit {} °C)',
+    ' · limite da CPU {} °C':
+        ' · CPU limit {} °C',
+    'Placa gráfica: a reservar {} MB de VRAM para o teste…':
+        'Graphics card: reserving {} MB of VRAM for the test…',
+    'Parado: GPU atingiu o limite de {} °C ({} °C)':
+        'Stopped: GPU reached the {} °C limit ({} °C)',
+    ', {} MB de VRAM em teste':
+        ', {} MB of VRAM under test',
+    'Placa gráfica: {} — cena 3D em {}×{}{}':
+        'Graphics card: {} — 3D scene at {}×{}{}',
+    'Placa gráfica: temperatura máx. {} °C':
+        'Graphics card: max temperature {} °C',
+    'sem erros em {} passagens ✔':
+        'no errors in {} passes ✔',
+    '{} píxeis errados ✘ — memória de vídeo instável (overclock, temperatura ou placa com defeito)!':
+        '{} wrong pixels ✘ — unstable video memory (overclock, temperature or faulty card)!',
+    '✘ Erro de VRAM: {} píxeis errados no bloco {} (≈ {} MB)':
+        '✘ VRAM error: {} wrong pixels in block {} (≈ {} MB)',
+    '{} FPS · {} passagens':
+        '{} FPS · {} passes',
+    'Desligada nos perfis: {}':
+        'Off in profiles: {}',
+    'Firewall desligada{} e serviços sensíveis abertos para a rede: {}. Ative a firewall ou desligue esses serviços.':
+        'Firewall off{} and sensitive services open to the network: {}. Turn on the firewall or turn off those services.',
+    'Firewall desligada{} — {} porta(s) aceitam ligações de outros aparelhos da rede. Numa rede pública (café, escola, hotel) é um risco.':
+        "Firewall off{} — {} port(s) accept connections from other devices on the network. On a public network (café, school, hotel) that's a risk.",
+    'Firewall desligada{}. Nenhum serviço está aberto para a rede agora, mas convém tê-la ligada.':
+        "Firewall off{}. No service is open to the network right now, but it's best to keep it on.",
+    '{} ativa. {} porta(s) abertas no PC, protegidas pela firewall (só passam as que autorizou).':
+        '{} active. {} port(s) open on the PC, protected by the firewall (only the ones you allowed get through).',
+    '{} ativa.':
+        '{} active.',
+    'Não foi possível verificar a firewall: {}':
+        "Couldn't check the firewall: {}",
+    'Ligar a firewall{}?':
+        'Turn on the firewall{}?',
+    '{} ficheiro(s) de histórico encontrados.':
+        '{} history file(s) found.',
+    'Quase sem bateria: {}. Carregue-os antes de jogar.':
+        'Almost out of battery: {}. Charge them before playing.',
+    '🔋 {}: {} % de bateria — carregue-o.':
+        '🔋 {}: {} % battery — charge it.',
 }

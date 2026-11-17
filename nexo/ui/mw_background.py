@@ -81,8 +81,8 @@ class BackgroundMixin:
             pass
 
         def work():
-            from ..core import battery, boottime, ramspeed, weekly
-            for fn in (boottime.record, ramspeed.modules, battery.batteries, display.monitors):
+            from ..core import battery, boottime, firewall, ramspeed, weekly
+            for fn in (boottime.record, ramspeed.modules, battery.batteries, display.monitors, firewall.scan):
                 try:
                     fn()
                 except Exception:  # noqa: BLE001 — uma sonda falhada não impede as outras
@@ -183,6 +183,7 @@ class BackgroundMixin:
     def _watch(self):
         """A cada 5 min: espaço livre dos discos e alterações na cache do S.M.A.R.T. (sem pedir palavra-passe)."""
         self._run_scheduled()
+        self._peripherals_check()
         if self._watch_busy or not (get_setting("alert_disk") or get_setting("alert_smart")):
             return
         self._watch_busy = True
@@ -204,6 +205,32 @@ class BackgroundMixin:
         def fail(_m):
             self._watch_busy = False
         run_async(work, on_done=done, on_fail=fail)
+
+    def _peripherals_check(self):
+        """Rato, teclado ou comando sem fios quase sem bateria: avisa uma vez por descarga."""
+        if not get_setting("alert_peripherals", True) or getattr(self, "_per_busy", False):
+            return
+        if IS_WIN and time.monotonic() - getattr(self, "_per_last", -1e9) < 1800:
+            return   # no Windows a leitura usa o PowerShell — a cada 30 min chega
+        self._per_last = time.monotonic()
+        from ..core import peripherals as per
+        self._per_busy = True
+        alerted: set = getattr(self, "_per_alerted", set())
+        self._per_alerted = alerted
+
+        def done(res):
+            self._per_busy = False
+            devs, _bt = res
+            for d in devs:
+                if d.low and d.name not in alerted:
+                    alerted.add(d.name)
+                    self._alert(f"🔋 {d.name}: {d.percent} % de bateria — carregue-o.", "warn", "Periféricos")
+                elif d.percent is not None and (d.charging or d.percent > per.LOW + 10):
+                    alerted.discard(d.name)
+
+        def fail(_m):
+            self._per_busy = False
+        run_async(per.scan, on_done=done, on_fail=fail)
 
     # ------------------------------------------------------------------ atualizações
     def _show_update_badge(self, data: dict):
