@@ -151,10 +151,14 @@ class GameModePage(Page):
         self.ses_sum = self._mk_table(["Jogo", "Sessões", "Tempo", "FPS médio", "CPU máx.", "GPU máx."], 180)
         ses.add(self.ses_sum)
         ses.add(label("Últimas sessões", "Section"))
-        self.ses_list = self._mk_table(["Jogo", "Quando", "Duração", "FPS médio", "1 % low", "Mín.", "CPU máx.",
-                                        "GPU máx."], 220)
-        self.ses_list.setToolTip("«1 % low»: o FPS abaixo do qual o jogo esteve 1 % do tempo — mostra as quebras "
-                                 "(engasgos) melhor do que a média. Calculado com uma amostra por segundo.")
+        self.ses_list = self._mk_table(["Jogo", "Quando", "Duração", "FPS médio", "1 % low", "Mín.", "Engasgos",
+                                        "CPU máx.", "GPU máx."], 220)
+        self.ses_list.setToolTip("Clique numa sessão para ver o gráfico de frametimes.\n«1 % low»: o FPS abaixo do "
+                                 "qual o jogo esteve 1 % do tempo — mostra as quebras melhor do que a média. "
+                                 "«Engasgos»: segundos com um fotograma 2,5× mais lento do que o normal.")
+        self.ses_list.setCursor(Qt.PointingHandCursor)
+        self.ses_list.cellClicked.connect(self._open_session)
+        self._recent: list = []
         ses.add(self.ses_list)
         self.add(ses)
 
@@ -249,6 +253,7 @@ class GameModePage(Page):
             cell(self.ses_sum, i, 3, fmt(g.fps_avg))
             cell(self.ses_sum, i, 4, fmt(g.cpu_max, " °C"))
             cell(self.ses_sum, i, 5, fmt(g.gpu_max, " °C"))
+        self._recent = recent
         self.ses_list.setRowCount(len(recent))
         for i, x in enumerate(recent):
             cell(self.ses_list, i, 0, x.game, False)
@@ -257,8 +262,19 @@ class GameModePage(Page):
             cell(self.ses_list, i, 3, fmt(x.fps_avg))
             cell(self.ses_list, i, 4, fmt(x.fps_low1))
             cell(self.ses_list, i, 5, fmt(x.fps_min))
-            cell(self.ses_list, i, 6, fmt(x.cpu_max, " °C"))
-            cell(self.ses_list, i, 7, fmt(x.gpu_max, " °C"))
+            cell(self.ses_list, i, 6, "—" if x.stutters is None else str(x.stutters))
+            cell(self.ses_list, i, 7, fmt(x.cpu_max, " °C"))
+            cell(self.ses_list, i, 8, fmt(x.gpu_max, " °C"))
+
+    def _open_session(self, row: int, _col: int = 0):
+        if not 0 <= row < len(self._recent) or self._recent[row].id is None:
+            return
+        from ...core import sessions
+        sess = sessions.get(self._recent[row].id)
+        if sess is None:
+            return
+        from ..session_dialog import SessionDialog
+        SessionDialog(self, sess).exec()
 
     def _clear_sessions(self):
         from ..widgets import confirm

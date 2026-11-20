@@ -118,6 +118,18 @@ def _page_factories(hub, on_settings):
         from .pages.programs import ProgramsPage
         return ProgramsPage()
 
+    def energy():
+        from .pages.energy import EnergyPage
+        return EnergyPage(hub)
+
+    def upgrade():
+        from .pages.upgrade import UpgradePage
+        return UpgradePage()
+
+    def snapshots():
+        from .pages.snapshots import SnapshotsPage
+        return SnapshotsPage()
+
     def settings():
         from .pages.settings import SettingsPage
         return SettingsPage(on_settings)
@@ -138,6 +150,10 @@ def _page_factories(hub, on_settings):
     if has_bat:
         sysitems.append(("Bateria", "battery", battery))
     sysitems.append(("Periféricos", "keyboard", peripherals))
+    sysitems.append(("Energia", "zap", energy))
+    util = [("Utilitários", "wrench", tools), ("Tarefas agendadas", "clock", tasks)]
+    if not IS_WIN:
+        util.append(("Snapshots", "shield", snapshots))
     return [
         (None, [("Visão geral", "home", dashboard)]),
         ("SISTEMA", [*sysitems,
@@ -149,13 +165,13 @@ def _page_factories(hub, on_settings):
         ("DESEMPENHO", [("Otimização", "zap", opt),
                         ("Modo jogo", "gamepad", gamemode),
                         ("Testes", "gauge", [("Benchmark", "gauge", benchmark),
-                                             ("Stress test", "flame", stress)])]),
+                                             ("Stress test", "flame", stress),
+                                             ("O que melhorar", "upgrade", upgrade)])]),
         ("FERRAMENTAS", [("Software", "upgrade", [("Atualizações", "upgrade", updates),
                                                   ("Instalar aplicações", "download", apps),
                                                   ("Programas instalados", "package", programs)]),
                          ("Internet", "wifi", internet),
-                         ("Utilitários", "wrench", [("Utilitários", "wrench", tools),
-                                                    ("Tarefas agendadas", "clock", tasks)]),
+                         ("Utilitários", "wrench", util),
                          ("Fundo de ecrã", "image", wallpaper)]),
         (None, [("Definições", "gear", settings)]),
     ]
@@ -374,6 +390,7 @@ class MainWindow(BackgroundMixin, GameMixin, QMainWindow):
         self.net.start()
         self._init_game()
         self._init_background()
+        self._init_web()
         self.current = -1
         last = get_setting("last_page_name") if get_setting("remember_page") else None
         self.go(self.names.index(last) if last in self.names else 0)
@@ -686,6 +703,41 @@ class MainWindow(BackgroundMixin, GameMixin, QMainWindow):
             if box is not None and box.isVisible():
                 box.setGeometry(self.centralWidget().rect())
 
+    # ------------------------------------------------------------------ painel no telemóvel
+    def _init_web(self):
+        if get_setting("web_panel"):
+            self.set_web_panel(True, quiet=True)
+        self.hub.updated.connect(self._web_tick)
+
+    def set_web_panel(self, on: bool, quiet: bool = False) -> tuple[bool, str]:
+        from ..core import webpanel
+        p = webpanel.panel()
+        if not on:
+            p.stop()
+            return True, ""
+        ok, msg = p.start()
+        if not ok and not quiet:
+            self.notify(msg, "bad")
+        elif not ok:
+            logging.getLogger("nexo.web").warning("Painel no telemóvel: %s", msg)
+        return ok, msg
+
+    def _web_tick(self, _r):
+        from ..core import webpanel
+        p = webpanel.panel()
+        if not p.running:
+            return
+        import socket
+        import time as _t
+        h = self.hub
+        f = self.overlay.last_fps if self.game is not None else None
+        p.update({"host": socket.gethostname(), "cpu_t": h.latest("cpu_temp"), "cpu_l": h.latest("cpu_load"),
+                  "gpu_t": h.latest("gpu_temp"), "gpu_l": h.latest("gpu_load"), "cpu_p": h.latest("cpu_power"),
+                  "gpu_p": h.latest("gpu_power"), "ram": h.latest("ram"), "vram": h.latest("vram"),
+                  "fps": f["fps"] if f else None, "ft": f["ft"] if f else None,
+                  "game": self.game.name if self.game is not None else "",
+                  "elapsed": _t.time() - self.game.started if self.game is not None else 0})
+
     def _live(self, _r):
         h = self.hub
         c = theme.C
@@ -796,6 +848,8 @@ class MainWindow(BackgroundMixin, GameMixin, QMainWindow):
             return
         set_setting("geometry", bytes(self.saveGeometry().toBase64()).decode())
         self._shutdown_game()
+        from ..core import webpanel
+        webpanel.panel().stop()
         if IS_WIN:
             from ..core import lhm
             lhm.stop_if_started()

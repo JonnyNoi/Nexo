@@ -88,7 +88,16 @@ FEATURES: dict[str, list[tuple[str, str]]] = {
                                              "pacotes tamanho espaço")],
     "Periféricos": [("Bluetooth", "bluetooth adaptador ligado aparelhos emparelhados"),
                     ("Bateria dos aparelhos sem fios", "bateria rato teclado comando auscultadores headset logitech "
-                                                       "dualsense xbox sem fios carregar")],
+                                                       "dualsense xbox sem fios carregar"),
+                    ("Testes de periféricos", "teste ecrã monitor píxeis mortos pixel morto ghosting rato polling "
+                                              "rate hz teclado teclas microfone colunas som esquerda direita")],
+    "Energia": [("Custo por dia", "energia eletricidade consumo kwh watts custo preço fatura conta da luz euros"),
+                ("Jogos", "consumo a jogar custo por hora"),
+                ("Preço e estimativas", "preço do kwh moeda resto do pc")],
+    "O que melhorar": [("O que limita nos jogos", "upgrade atualizar peça gargalo bottleneck comprar placa "
+                                                  "gráfica processador memória ssd recomendação")],
+    "Snapshots": [("Criar snapshot", "snapshot snapper timeshift btrfs restaurar voltar atrás ponto de restauro "
+                                     "apagar snapshots rollback")],
     "Privacidade": [("Recolha de dados", "privacidade telemetria estatísticas relatórios de erros apport abrt "
                                          "pkgstats popcon localização kuserfeedback recentes"),
                     ("Histórico de ficheiros recentes", "apagar recentes histórico documentos abertos")],
@@ -108,16 +117,20 @@ FEATURES: dict[str, list[tuple[str, str]]] = {
     "Modo jogo": [("Overlay", "fps temperaturas por cima do jogo osd hud mangohud"),
                   ("Deteção de jogos", "steam proton wine lutris heroic epic gog detetar"),
                   ("Perfis por jogo", "perfil jogo energia desempenho fechar programas gamemode feral"),
-                  ("Jogos instalados", "biblioteca jogar lançar")],
+                  ("Jogos instalados", "biblioteca jogar lançar"),
+                  ("Sessões de jogo", "frametime frametimes engasgos stutter gráfico 1% low histórico")],
     "Atualizações": [("Atualizar tudo", "atualizar update upgrade pacman paru yay aur flatpak winget apt dnf pacotes "
                                          "versões novas checkupdates"),
-                     ("Verificar automaticamente", "procurar atualizações a cada 6 horas contador")],
+                     ("Verificar automaticamente", "procurar atualizações a cada 6 horas contador"),
+                     ("BIOS / UEFI", "bios uefi firmware atualizar versão placa-mãe fwupd flash")],
     "Fundo de ecrã": [("Fundo atual", "wallpaper papel de parede ambiente de trabalho imagem de fundo desktop"),
                       ("Os meus fundos", "galeria imagens guardadas"),
                       ("Procurar no Wallhaven", "anime wallpaper"), ("Troca automática", "aleatório trocar")],
     "Definições": [("Aparência", "tema escuro claro modo noturno"),
                    ("Alertas", "avisos sobreaquecimento limite temperatura ram memória disco cheio espaço smart"),
                    ("Proteção (pontos de restauro)", "snapshot snapper timeshift restauro voltar atrás backup"),
+                   ("Painel no telemóvel", "telemóvel telefone celular browser rede local wifi web sensores "
+                                           "remoto qr"),
                    ("Histórico dos sensores", "apagar guardar gráfico"),
                    ("Janela e bandeja", "tray minimizado"),
                    ("Abrir registo de erros", "log nexo.log crash falha bug reportar problema"),

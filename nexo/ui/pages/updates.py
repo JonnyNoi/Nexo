@@ -95,6 +95,9 @@ class UpdatesPage(Page):
         drv.add(self.comp_body)
         drv.add(hbox(None, self.btn_comp))
         self.add(drv)
+        from ..bios_card import BiosCard
+        self.bios = BiosCard()
+        self.add(self.bios)
         self._components: list = []
         self._drv_checked = False
 
@@ -192,6 +195,7 @@ class UpdatesPage(Page):
         if not self._drv_checked:
             self._drv_checked = True
             self.check_drivers()
+            self.bios.ensure_checked()
         data = up.cached()
         if data:
             self._show(data)

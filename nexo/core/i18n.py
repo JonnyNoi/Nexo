@@ -38,7 +38,8 @@ def set_lang_for_tests(v: str | None) -> None:
 def _catalog() -> dict[str, str]:
     from .i18n_en import EN
     from .i18n_en_more import EN_MORE
-    return {**EN_MORE, **EN}
+    from .i18n_en_v24 import EN_V24
+    return {**EN_V24, **EN_MORE, **EN}
 
 
 @lru_cache(maxsize=1)
@@ -51,8 +52,9 @@ def _upper() -> dict[str, str]:
 def _templates() -> list[tuple[re.Pattern, str]]:
     from .i18n_en import TEMPLATES
     from .i18n_en_more import TEMPLATES_MORE
+    from .i18n_en_v24 import TEMPLATES_V24
     out = []
-    for src, dst in {**TEMPLATES_MORE, **TEMPLATES}.items():
+    for src, dst in {**TEMPLATES_V24, **TEMPLATES_MORE, **TEMPLATES}.items():
         out.append((re.compile("(.+?)".join(re.escape(p) for p in src.split("{}")), re.S), dst))
     # os modelos mais compridos primeiro (mais específicos)
     out.sort(key=lambda t: -len(t[0].pattern))

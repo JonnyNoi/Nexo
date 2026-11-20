@@ -270,6 +270,8 @@ class DiskHealthPage(Page):
             parts.append(f"{status_dot('muted')} {counts['unknown']} sem dados")
         self.status.setTextFormat(Qt.RichText)
         self.status.setText(f"{len(disks)} disco(s) · última leitura {when} &nbsp; " + " &nbsp; ".join(parts))
+        from ...core import smarthist
+        self._hist = smarthist._load()
         order = {"bad": 0, "warn": 1, "unknown": 2, "ok": 3}
         for d in sorted(disks, key=lambda x: order.get(x["verdict"], 9)):
             self.list_lay.addWidget(self._disk_card(d))
@@ -334,6 +336,7 @@ class DiskHealthPage(Page):
             card.add(lb)
         if d.get("selftest"):
             card.add(label(f"Último autoteste: {d['selftest']}", "Muted", wrap=True))
+        self._trend(card, d)
 
         table = QTableWidget(len(d["attrs"]), 3)
         table.setHorizontalHeaderLabels(["Atributo", "Valor", "Normalizado"])
@@ -373,6 +376,25 @@ class DiskHealthPage(Page):
             card.add(row)
             card.add(table)
         return card
+
+    def _trend(self, card: Card, d: dict):
+        """Evolução ao longo do tempo: setores a subir, quando acaba a vida do SSD, escrita por dia."""
+        from ...core import smarthist
+        tr = smarthist.for_disk(d, getattr(self, "_hist", None))
+        for k, text in tr.notes:
+            card.add(label(f"{status_dot(k)} {text}", wrap=True))
+        bits = []
+        if tr.days:
+            bits.append(f"Histórico de {tr.days} dias")
+        if tr.written_per_day:
+            bits.append(f"escreve ~{human_bytes(tr.written_per_day)} por dia")
+        if not tr.days:
+            bits.append("A partir de hoje o Nexo guarda a evolução deste disco (uma leitura por dia) para avisar "
+                        "se os setores estragados começarem a subir e prever o fim da vida útil")
+        elif tr.days < smarthist.MIN_SPAN_DAYS and d.get("life") is not None and tr.life_eta_days is None:
+            bits.append(f"a previsão da vida útil precisa de {smarthist.MIN_SPAN_DAYS} dias de histórico")
+        from ...core.i18n import tr
+        card.add(label(" · ".join(tr(b) for b in bits) + ".", "Muted", wrap=True))
 
     def _selftest(self, dev: str):
         def done(res):

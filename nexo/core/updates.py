@@ -229,10 +229,14 @@ def update_command() -> str:
 
 
 def open_terminal_update() -> tuple[bool, str]:
-    cmd = update_command()
+    return open_terminal(update_command())
+
+
+def open_terminal(cmd: str) -> tuple[bool, str]:
+    """Abre um terminal a correr `cmd` (interativo: pode pedir a palavra-passe ou confirmações)."""
     if IS_WIN:
         subprocess.Popen(["cmd", "/c", "start", "", "cmd", "/k", cmd])
-        return True, "Abri uma janela de comandos com a atualização."
+        return True, f"Abri uma janela de comandos com: {cmd}"
     script = f"{cmd} ; echo ; echo 'Concluído — pode fechar esta janela.'"
     for term, args in _TERMINALS:
         if shutil.which(term):

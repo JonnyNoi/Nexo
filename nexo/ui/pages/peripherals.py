@@ -25,6 +25,20 @@ class PeripheralsPage(Page):
         self.bt_list = label("", "Muted", wrap=True)
         bt.add(self.bt_list)
         self.add(bt)
+        tests = Card("Testes de periféricos", "Verifique se tudo funciona como deve — útil depois de comprar um "
+                     "monitor, rato ou teclado novo (ainda dentro do prazo de devolução).", icon="sparkle")
+        row2 = hbox()
+        for txt, tip, fn in (("Ecrã", "Píxeis mortos ou presos, fugas de luz, degradê e ghosting (ecrã inteiro).",
+                              self._screen),
+                             ("Rato", "Polling rate, botões, roda e cliques duplos fantasma.", self._mouse),
+                             ("Teclado", "Todas as teclas e quantas funcionam ao mesmo tempo.", self._keyboard),
+                             ("Som e microfone", "Coluna esquerda/direita e nível do microfone.", self._audio)):
+            b = QPushButton(txt)
+            b.setToolTip(tip)
+            b.clicked.connect(fn)
+            row2.addWidget(b, 1)
+        tests.add(row2)
+        self.add(tests)
         holder = QWidget()
         holder.setObjectName("Transparent")
         self.box = QVBoxLayout(holder)
@@ -35,6 +49,23 @@ class PeripheralsPage(Page):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.load)
         self._busy = False
+
+    # ------------------------------------------------------------------ testes
+    def _screen(self):
+        from ..periph_tests import ScreenTest
+        self._screen_win = ScreenTest.run(self.window())
+
+    def _mouse(self):
+        from ..periph_tests import MouseTest
+        MouseTest(self).exec()
+
+    def _keyboard(self):
+        from ..periph_tests import KeyboardTest
+        KeyboardTest(self).exec()
+
+    def _audio(self):
+        from ..periph_tests import AudioTest
+        AudioTest(self).exec()
 
     def on_show(self):
         self.load()

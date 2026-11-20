@@ -57,10 +57,13 @@ class GameMixin:
             self._game_ended(old)
             self._profile_stop()
         self.game = g
+        self.hub.gaming = g is not None
         self.overlay.fps.set_game(g)
         if g is not None:
             from ..core import gameprofile
-            self.game_stats = {"cpu_max": None, "gpu_max": None, "start": g.started, "fps": []}
+            self.game_stats = {"cpu_max": None, "gpu_max": None, "start": g.started, "fps": [], "timeline": [],
+                               "load": {"cpu": [0.0, 0], "gpu": [0.0, 0]}, "vram_max": None, "ram_max": None,
+                               "wh": 0.0, "power_seen": False}
             extra = self._profile_start(g)
             if get_setting("game_notify"):
                 if gameprofile.overlay_for(g.name, get_setting("overlay_auto")):
@@ -97,10 +100,21 @@ class GameMixin:
 
     def _game_tick(self, _r):
         if self.game is not None:
-            for key, k in (("cpu_temp", "cpu_max"), ("gpu_temp", "gpu_max")):
+            st = self.game_stats
+            for key, k in (("cpu_temp", "cpu_max"), ("gpu_temp", "gpu_max"), ("vram", "vram_max"),
+                           ("ram", "ram_max")):
                 v = self.hub.latest(key)
-                if v is not None and (self.game_stats.get(k) is None or v > self.game_stats[k]):
-                    self.game_stats[k] = v
+                if v is not None and (st.get(k) is None or v > st[k]):
+                    st[k] = v
+            for comp in ("cpu", "gpu"):
+                v = self.hub.latest(f"{comp}_load")
+                if v is not None and "load" in st:
+                    st["load"][comp][0] += v
+                    st["load"][comp][1] += 1
+            cp, gp = self.hub.latest("cpu_power"), self.hub.latest("gpu_power")
+            if cp is not None or gp is not None:
+                st["wh"] = st.get("wh", 0.0) + ((cp or 0) + (gp or 0)) / 3600
+                st["power_seen"] = True
         # o processo do overlay pode ter ido abaixo: volta a lançá-lo (no máximo a cada 10 s)
         from ..core import gameprofile
         want = self.overlay_manual or (self.game is not None
@@ -118,6 +132,7 @@ class GameMixin:
             st["fps_n"] = st.get("fps_n", 0) + 1
             st["fps_min"] = min(st.get("fps_min") or f["fps"], f["fps"])
             st.setdefault("fps", []).append(f["fps"])
+            st.setdefault("timeline", []).append([f["fps"], f.get("ft_max")])
 
     def _save_session(self, g, wait: bool = False):
         """Guarda a sessão no histórico (Modo jogo → Sessões de jogo)."""
@@ -128,8 +143,18 @@ class GameMixin:
             return
         st["saved"] = True
         avg, low1, mn = sessions.fps_stats(st.get("fps") or [])
+        load = st.get("load") or {}
+
+        def mean(comp):
+            s_, n = load.get(comp, (0.0, 0))
+            return s_ / n if n else None
+        tl = st.get("timeline") or []
         sess = sessions.Session(g.name, st.get("start") or _t.time(), _t.time(), st.get("cpu_max"), st.get("gpu_max"),
-                                avg, low1, mn)
+                                avg, low1, mn, cpu_load=mean("cpu"), gpu_load=mean("gpu"),
+                                vram_max=st.get("vram_max"), ram_max=st.get("ram_max"),
+                                wh=st.get("wh") if st.get("power_seen") else None,
+                                stutters=sessions.count_stutters(tl) if len(tl) >= 10 else None,
+                                timeline=tl if len(tl) >= 10 else None)
         if wait:   # ao sair do Nexo com o jogo ainda aberto
             sessions.add(sess)
             return

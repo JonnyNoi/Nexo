@@ -141,6 +141,14 @@ DEFAULT_SETTINGS = {
     "auto_clean_freed": 0,           # total libertado desde que foi ligada (bytes)
     # Windows: abrir o LibreHardwareMonitor (instalado pelo Nexo) escondido quando o Nexo arranca
     "lhm_autostart": True,
+    # energia (página Energia)
+    "energy_price": 0.20,            # preço do kWh
+    "energy_currency": "€",
+    "energy_rest_w": 50,             # estimativa do resto do PC (placa-mãe, discos, ventoinhas, fonte), em W
+    # painel no telemóvel (servidor web na rede local, desligado por omissão)
+    "web_panel": False,
+    "web_port": 8765,
+    "web_token": "",                 # código na ligação (gerado na primeira vez)
     # atualizações do próprio Nexo
     "self_update_check": True,
     "self_update_last": 0,

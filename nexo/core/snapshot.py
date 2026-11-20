@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import time
+from dataclasses import dataclass
 
 from .util import IS_LINUX, IS_WIN, get_setting, is_admin, read_text, run, run_root, set_setting, which
 
@@ -105,16 +107,21 @@ def before(what: str) -> tuple[bool, str] | None:
     return ok, msg
 
 
-def create(what: str = "alterações manuais") -> tuple[bool, str]:
-    """Cria já um ponto de restauro (ignora o intervalo mínimo)."""
+def create(what: str = "alterações manuais", desc: str | None = None) -> tuple[bool, str]:
+    """Cria já um ponto de restauro (ignora o intervalo mínimo). `desc` substitui a descrição automática."""
     b = backend()
     if b == "windows":
         if not is_admin():
             return False, "Precisa de executar o Nexo como administrador para criar pontos de restauro."
         from .systools import win_restore_point
-        ok, msg = win_restore_point(_desc(what))
+        ok, msg = win_restore_point(desc or _desc(what))
     elif b in ("snapper", "timeshift"):
-        code, out = run_root(linux_cmd(what, b), timeout=900)
+        cmd = linux_cmd(what, b)
+        if desc:
+            d = shlex.quote("".join(c for c in desc if c.isprintable())[:80])
+            cmd = (f"snapper -c root create -t single -c number -d {d}" if b == "snapper"
+                   else f"timeshift --create --scripted --comments {d}")
+        code, out = run_root(cmd, timeout=900)
         ok = code == 0
         msg = "Snapshot criado. " + how_to_restore(b) if ok else (out.strip()[-300:] or "Falhou")
     else:
@@ -148,3 +155,116 @@ def list_recent(limit: int = 5) -> list[tuple[str, str]]:
                 if str(d.get("Description", "")).startswith("Nexo")]
         return rows[-limit:][::-1]
     return []
+
+
+# --------------------------------------------------------------------------- gestão (página Snapshots, Linux)
+@dataclass
+class Snap:
+    id: str                 # número (snapper) ou nome (timeshift)
+    date: str
+    desc: str
+    kind: str = ""          # single / pre / post (snapper) ou etiquetas (timeshift: O, B, H, D, W, M)
+    size: int | None = None  # espaço exclusivo (snapper com quotas)
+    cleanup: str = ""
+
+    @property
+    def by_nexo(self) -> bool:
+        return self.desc.startswith("Nexo")
+
+
+def parse_snapper_json(text: str) -> list[Snap]:
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return []
+    out = []
+    for s in data.get("root", []) if isinstance(data, dict) else []:
+        n = s.get("number")
+        if not n:            # 0 = o sistema atual
+            continue
+        size = s.get("used-space")
+        out.append(Snap(str(n), str(s.get("date", ""))[:16], str(s.get("description", "")), str(s.get("type", "")),
+                        int(size) if isinstance(size, (int, float)) else None, str(s.get("cleanup", ""))))
+    return out
+
+
+_TS_ROW = re.compile(r"^\s*\d+\s+>\s+(\S+)\s+([OBHDWM]*)\s*(.*?)\s*$")
+
+
+def parse_timeshift_list(text: str) -> list[Snap]:
+    out = []
+    for ln in text.splitlines():
+        m = _TS_ROW.match(ln)
+        if m:
+            name = m.group(1)
+            date = name.replace("_", " ", 1)
+            if len(date) >= 16:
+                date = date[:10] + " " + date[11:16].replace("-", ":")
+            out.append(Snap(name, date, m.group(3), m.group(2)))
+    return out
+
+
+def list_all() -> tuple[bool, list[Snap], str]:
+    """(conseguiu ler, snapshots do mais recente para o mais antigo, erro). Pode pedir a palavra-passe."""
+    b = backend()
+    if b == "snapper":
+        cmd = ["snapper", "-c", "root", "--jsonout", "list"]
+        code, out = run(cmd, timeout=30)
+        if code != 0:   # a lista só é legível pelo root (sem ALLOW_USERS na configuração)
+            code, out = run_root(cmd, timeout=120)
+        if code != 0:
+            return False, [], (out.strip()[-300:] or "Não foi possível ler os snapshots.")
+        return True, parse_snapper_json(out[out.find("{"):] if "{" in out else out)[::-1], ""
+    if b == "timeshift" or (IS_LINUX and which("timeshift")):
+        code, out = run_root(["timeshift", "--list", "--scripted"], timeout=120)
+        if code != 0:
+            return False, [], (out.strip()[-300:] or "Não foi possível ler os snapshots.")
+        return True, parse_timeshift_list(out)[::-1], ""
+    return False, [], "Não há snapper nem Timeshift configurados."
+
+
+def delete(ids: list[str]) -> tuple[bool, str]:
+    """Apaga snapshots (um pedido de palavra-passe para todos)."""
+    b = backend()
+    ids = [i for i in ids if re.fullmatch(r"[\w.:-]+", i)]
+    if not ids:
+        return False, "Nada selecionado."
+    if b == "snapper":
+        code, out = run_root(["snapper", "-c", "root", "delete", *ids], timeout=600)
+    elif b == "timeshift" or which("timeshift"):
+        cmd = " && ".join(f"timeshift --delete --snapshot {shlex.quote(i)} --scripted" for i in ids)
+        code, out = run_root(cmd, timeout=900)
+    else:
+        return False, "Não há snapper nem Timeshift configurados."
+    if code == 0:
+        return True, f"{len(ids)} snapshot(s) apagado(s)."
+    return False, out.strip()[-300:] or "Falhou"
+
+
+def restore_tool() -> tuple[list[str], str] | None:
+    """Programa gráfico para restaurar (o restauro reinicia o sistema — melhor feito numa ferramenta própria)."""
+    for exe, name in (("btrfs-assistant-launcher", "Btrfs Assistant"), ("btrfs-assistant", "Btrfs Assistant"),
+                      ("timeshift-launcher", "Timeshift"), ("timeshift-gtk", "Timeshift")):
+        if which(exe):
+            return [exe], name
+    return None
+
+
+def root_fstype() -> str:
+    if not IS_LINUX:
+        return ""
+    code, out = run(["findmnt", "-no", "FSTYPE", "/"], timeout=5)
+    return out.strip() if code == 0 else ""
+
+
+def setup_hint() -> str:
+    """O que fazer quando não há snapshots configurados."""
+    fs = root_fstype()
+    if fs == "btrfs":
+        return ("O sistema está em btrfs, por isso os snapshots são instantâneos e quase não ocupam espaço. "
+                "Instale o snapper (e o snap-pac no Arch, para um snapshot antes de cada atualização) ou o "
+                "Timeshift em modo btrfs, e configure-o para a raiz (/).")
+    if fs:
+        return (f"O sistema está em {fs}: snapshots instantâneos precisam de btrfs. O Timeshift em modo rsync "
+                "funciona em qualquer sistema de ficheiros, mas cada cópia demora minutos e ocupa espaço.")
+    return "Instale o snapper ou o Timeshift para criar snapshots do sistema."

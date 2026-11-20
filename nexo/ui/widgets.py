@@ -566,8 +566,11 @@ class SensorHub(QObject):
         self.csv_path: str | None = None
         self._alert_state: dict[str, float] = {}
         self._ram_high = 0                  # segundos seguidos com a RAM acima do limite
+        from ..core.energy import Meter
         from ..core.history import History
         self.record = History()             # histórico em disco (média por minuto, 7 dias)
+        self.energy = Meter()               # energia por dia (página Energia)
+        self.gaming = False                 # a janela principal marca quando há um jogo aberto
         self._stop = threading.Event()
         self._got_sig.connect(self._got, Qt.QueuedConnection)
         threading.Thread(target=self._loop, daemon=True, name="sensors").start()
@@ -625,6 +628,7 @@ class SensorHub(QObject):
         from ..core.util import get_setting
         if get_setting("history"):
             self.record.add(snap)
+        self.energy.add(snap.get("cpu_power"), snap.get("gpu_power"), self.gaming)
         self._check_alerts(snap)
         self.updated.emit(readings)
 
@@ -714,3 +718,7 @@ class SensorHub(QObject):
             self.record.close()
         except Exception:  # noqa: BLE001
             logging.getLogger("nexo.history").exception("Falha a fechar o histórico")
+        try:
+            self.energy.close()
+        except Exception:  # noqa: BLE001
+            logging.getLogger("nexo.energy").exception("Falha a gravar o consumo de energia")

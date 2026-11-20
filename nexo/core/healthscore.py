@@ -65,7 +65,30 @@ def slow_checks(now: float | None = None) -> list[Check]:
     out += _display()
     out += _firewall()
     out += _boot()
+    out += _smart_trend()
+    out += _bios()
     return out
+
+
+def _smart_trend() -> list[Check]:
+    """Setores estragados a subir ou SSD perto do fim da vida (histórico S.M.A.R.T.)."""
+    from . import smart, smarthist
+    data = smart.cached() or {}
+    hist = smarthist._load()
+    for d in data.get("disks") or []:
+        tr = smarthist.for_disk(d, hist)
+        bad = [t for k, t in tr.notes if k == "bad"]
+        if bad:
+            return [Check("bad", f"{d.get('model') or 'Disco'}: {bad[0]}", "Saúde dos discos", "Ver")]
+    return []
+
+
+def _bios() -> list[Check]:
+    from . import bios
+    c = bios.cached()
+    if c and c.get("fwupd_update"):
+        return [Check("warn", f"Há uma atualização do BIOS/UEFI: {c['fwupd_update']}.", "Atualizações", "Ver")]
+    return []
 
 
 def _battery() -> list[Check]:

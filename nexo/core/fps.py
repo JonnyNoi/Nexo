@@ -51,19 +51,20 @@ def _user_mangohud_dirs() -> list[Path]:
     return out
 
 
-def _tail_line(path: Path) -> str:
+def _tail_lines(path: Path, n: int) -> list[str]:
+    """Últimas n linhas completas (a última pode estar a meio de ser escrita e fica de fora)."""
     with open(path, "rb") as f:
         f.seek(0, os.SEEK_END)
         size = f.tell()
-        f.seek(max(0, size - 2048))
+        f.seek(max(0, size - 4096))
         chunk = f.read().decode("utf-8", "replace")
     lines = [ln for ln in chunk.split("\n") if ln.strip()]
     if not chunk.endswith("\n") and lines:
-        lines.pop()          # última linha ainda a meio de ser escrita
-    return lines[-1] if lines else ""
+        lines.pop()
+    return lines[-n:]
 
 
-def _read_mangohud() -> tuple[float, float] | None:
+def _read_mangohud() -> tuple[float, float, float | None] | None:
     now = time.time()
     best: tuple[float, Path] | None = None
     for d in [mangohud_dir(), *_user_mangohud_dirs()]:
@@ -78,15 +79,24 @@ def _read_mangohud() -> tuple[float, float] | None:
     if best is None:
         return None
     try:
-        cols = _tail_line(best[1]).split(",")
-        if len(cols) < 10:
+        rows = [ln.split(",") for ln in _tail_lines(best[1], 4)]   # 4 linhas de 250 ms = o último segundo
+        rows = [c for c in rows if len(c) >= 10]
+        if not rows:
             return None
-        fps, ft = float(cols[0]), float(cols[1])
+        fps, ft = float(rows[-1][0]), float(rows[-1][1])
+        fts = []
+        for c in rows:
+            try:
+                fts.append(float(c[1]))
+            except ValueError:
+                continue
     except (OSError, ValueError):
         return None
     if not 0 < fps < 5000:
         return None
-    return fps, (ft if ft > 0 else 1000.0 / fps)
+    ft = ft if ft > 0 else 1000.0 / fps
+    worst = max((x for x in fts if 0 < x < 5000), default=None)
+    return fps, ft, worst
 
 
 def prune_mangohud_logs(keep: int = 8) -> None:
@@ -103,7 +113,7 @@ def prune_mangohud_logs(keep: int = 8) -> None:
 
 
 # ============================================================================================ Windows: RTSS
-def _read_rtss(pid: int) -> tuple[float, float] | None:
+def _read_rtss(pid: int) -> tuple[float, float, float | None] | None:
     if not IS_WIN:
         return None
     import ctypes
@@ -138,7 +148,7 @@ def _read_rtss(pid: int) -> tuple[float, float] | None:
             if not cands:
                 return None
             _mine, fps, ft = max(cands)
-            return fps, ft
+            return fps, ft, None
         finally:
             k32.UnmapViewOfFile(view)
     except Exception:
@@ -286,7 +296,7 @@ class _PresentMon:
                 self.names[pid] = app
                 self.last[pid] = time.monotonic()
 
-    def read(self, pids: set[int]) -> tuple[float, float] | None:
+    def read(self, pids: set[int]) -> tuple[float, float, float | None] | None:
         now = time.monotonic()
         with self.lock:
             live = [p for p, t in self.last.items() if now - t < 2]
@@ -296,15 +306,16 @@ class _PresentMon:
                 return None
             mine = [p for p in live if p in pids]
             pid = mine[0] if mine else max(live, key=lambda p: len(self.frames[p]))
-            total, n = 0.0, 0
+            total, n, worst = 0.0, 0, 0.0
             for ms in reversed(self.frames[pid]):     # último ~1 s de fotogramas
                 total += ms
                 n += 1
+                worst = max(worst, ms)
                 if total >= 1000:
                     break
         if not n or total <= 0:
             return None
-        return 1000.0 * n / total, total / n
+        return 1000.0 * n / total, total / n, worst
 
     def stop(self):
         if self.proc is not None:
@@ -320,7 +331,8 @@ class _PresentMon:
 
 # ============================================================================================ medidor
 class FpsMeter:
-    """Chamar `set_game` quando o jogo muda e `read()` 1×/s. `read` devolve {"fps", "ft", "src"} ou None."""
+    """Chamar `set_game` quando o jogo muda e `read()` 1×/s. `read` devolve {"fps", "ft", "ft_max", "src"} ou None
+    (ft_max: o fotograma mais lento do último segundo — mostra os engasgos que a média esconde)."""
 
     def __init__(self):
         self.pid = 0
@@ -368,7 +380,9 @@ class FpsMeter:
         self.src = src if r else ""
         if r is None:
             return None
-        return {"fps": round(r[0], 1), "ft": round(r[1], 2), "src": src}
+        worst = r[2] if len(r) > 2 and r[2] else None
+        return {"fps": round(r[0], 1), "ft": round(r[1], 2), "ft_max": round(worst, 2) if worst else None,
+                "src": src}
 
     def error(self) -> str:
         return self.pm.error if self.pm is not None else ""

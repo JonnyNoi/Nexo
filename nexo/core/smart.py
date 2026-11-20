@@ -122,6 +122,12 @@ def read_all() -> dict:
             save_json(CACHE, res)
         except OSError:
             pass
+        try:
+            from . import smarthist
+            smarthist.record(res["disks"])
+        except Exception:  # noqa: BLE001 — o histórico nunca impede a leitura
+            import logging
+            logging.getLogger("nexo.smart").warning("Não foi possível guardar o histórico S.M.A.R.T.", exc_info=True)
     return res
 
 
@@ -204,7 +210,8 @@ def _base(dev: str, model: str, size: int) -> dict:
     return {"dev": dev, "model": model, "serial": "", "firmware": "", "size": size, "kind": "Disco",
             "interface": "", "passed": None, "temp": None, "hours": None, "cycles": None, "unsafe": None,
             "written": None, "read": None, "life": None, "selftest": "", "can_selftest": False,
-            "attrs": [], "verdict": "unknown", "reasons": [], "error": ""}
+            "attrs": [], "verdict": "unknown", "reasons": [], "error": "",
+            "realloc": None, "pending": None, "media_errors": None}
 
 
 def _unreadable(dev: str, model: str, size: int, why: str) -> dict:
@@ -323,6 +330,8 @@ def _parse_nvme(j: dict, d: dict, reasons: list) -> None:
     if spare is not None and thr is not None and spare <= thr:
         reasons.append(("bad", f"Blocos de reserva esgotados ({spare}% ≤ limite {thr}%)."))
     me = int(h.get("media_errors") or 0)
+    if "media_errors" in h:
+        d["media_errors"] = me
     if me:
         reasons.append(("warn" if me < 10 else "bad", f"{me} erro(s) de integridade dos dados registados."))
     labels = [("critical_warning", "Aviso crítico", lambda v: "nenhum" if not v else str(v),
@@ -406,6 +415,9 @@ def _parse_ata(j: dict, d: dict, reasons: list, status: int) -> None:
                 d["written"] = v * unit
                 break
     d["unsafe"] = raw(192) if raw(192) is not None else raw(174)
+    d["realloc"] = raw(5)
+    pend = [v for v in (raw(197), raw(198)) if v is not None]
+    d["pending"] = sum(pend) if pend else None
 
     for a in table:
         i = a.get("id")

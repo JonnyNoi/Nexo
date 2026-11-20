@@ -20,7 +20,7 @@ from .util import APP_NAME, APP_VERSION, DEFAULT_SETTINGS, _save_lock, config_di
 
 # definições que pertencem a esta sessão/máquina e nunca viajam
 LOCAL_KEYS = {"geometry", "last_page_name", "snapshot_last", "wp_auto_last", "tray_hint_shown", "wallpaper",
-              "desktop_wp", "av_last_scan", "speed_history", "rel_seen"}
+              "desktop_wp", "av_last_scan", "speed_history", "rel_seen", "web_token"}
 LOCAL_SUFFIXES = ("_last", "_at", "_time")
 MAX_BYTES = 20 * 1024 * 1024
 
@@ -118,6 +118,9 @@ def import_backup(path: str | Path, include_history: bool = True) -> dict:
             try:
                 sess = sessions.Session(**{k: row.get(k) for k in ("game", "start", "end", "cpu_max", "gpu_max",
                                                                      "fps_avg", "fps_low1", "fps_min")})
+                for k in ("cpu_load", "gpu_load", "vram_max", "ram_max", "wh", "stutters"):   # 2.4+
+                    if isinstance(row.get(k), (int, float)) and not isinstance(row.get(k), bool):
+                        setattr(sess, k, row[k])
             except TypeError:
                 continue
             if not isinstance(sess.game, str) or not isinstance(sess.start, (int, float)) \

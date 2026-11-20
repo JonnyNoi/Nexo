@@ -99,6 +99,10 @@ class SettingsPage(Page):
         win.add(SettingRow("Abrir com o sistema", "Inicia o Nexo minimizado quando entra na sessão.", self.tg_auto))
         self.add(win)
 
+        from ..webpanel_card import WebPanelCard
+        self.web = WebPanelCard()
+        self.add(self.web)
+
         self._build_autoclean()
         self._build_backup()
         self._build_selfupdate()
@@ -357,6 +361,7 @@ class SettingsPage(Page):
         if hasattr(win, "set_nav_badge"):
             win.set_nav_badge("Definições", None)
         self._autoclean_info()
+        self.web.on_show()
 
     # ------------------------------------------------------------------
     def _toggle(self, key) -> Toggle:
