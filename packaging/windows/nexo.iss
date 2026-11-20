@@ -1,7 +1,7 @@
 ; Instalador do Nexo para Windows (Inno Setup 6/7).
 ; Gerado por: ./build_windows_wine.sh --instalador   →   Aplicacao/Windows/Nexo-Instalador-<versão>.exe
 #ifndef AppVersion
-  #define AppVersion "2.2"
+  #define AppVersion "2.4"
 #endif
 
 [Setup]

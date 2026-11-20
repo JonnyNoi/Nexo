@@ -117,7 +117,7 @@ Publicar uma etiqueta gera tudo no GitHub Actions (`.github/workflows/release.ym
 Ubuntu 22.04 para correr em mais distribuições) + `Nexo-x86_64.AppImage` + `Nexo.exe` + instalador → release com `SHA256SUMS`.
 ```sh
 # APP_VERSION em nexo/core/util.py tem de ser igual à etiqueta (o workflow confirma)
-git tag -a v2.3 -m "Nexo 2.3" && git push origin v2.3
+git tag -a v2.4 -m "Nexo 2.4" && git push origin v2.4
 ```
 Para o Nexo instalado se atualizar sozinho, ponha o repositório em `UPDATE_REPO` (`nexo/core/util.py`, ex.:
 `"utilizador/nexo"`): verifica uma vez por dia, confirma o SHA-256 que o GitHub publica e pede autorização.

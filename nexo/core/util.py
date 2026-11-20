@@ -15,7 +15,7 @@ IS_LINUX = sys.platform.startswith("linux")
 
 APP_NAME = "Nexo"
 LEGACY_NAME = "PCForge"  # nome antigo (para migrar definições)
-APP_VERSION = "2.3"
+APP_VERSION = "2.4"
 # repositório GitHub ("dono/nome") de onde o Nexo procura versões novas (releases com os ficheiros
 # "Nexo" e "Nexo.exe"). Vazio = sem verificação de atualizações do próprio Nexo.
 UPDATE_REPO = "JonnyNoi/Nexo"
