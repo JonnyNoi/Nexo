@@ -6,6 +6,8 @@ import sys
 
 def main() -> int:
     multiprocessing.freeze_support()  # necessário no .exe do Windows (PyInstaller)
+    from .core.util import fix_ssl_certs
+    fix_ssl_certs()  # executável do Linux noutras distribuições: certificados HTTPS no sítio certo
     from . import cli
     if cli.wants_cli(sys.argv):   # nexo --saude, --limpar, --relatorio… (sem janela)
         return cli.main(sys.argv)

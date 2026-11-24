@@ -266,6 +266,35 @@ def is_appimage() -> bool:
     return bool(ai and getattr(sys, "frozen", False) and os.path.isfile(ai))
 
 
+# Ficheiros de certificados (CA) das várias distribuições Linux
+_CA_BUNDLES = ("/etc/ssl/certs/ca-certificates.crt",                 # Debian/Ubuntu, Arch, CachyOS, Gentoo, Alpine
+               "/etc/pki/tls/certs/ca-bundle.crt",                   # Fedora, RHEL
+               "/etc/ssl/ca-bundle.pem",                             # openSUSE
+               "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",  # Fedora/RHEL (novo)
+               "/etc/ssl/cert.pem")                                  # Arch, Alpine, macOS
+
+
+def fix_ssl_certs() -> None:
+    """Executável do PyInstaller/AppImage (Linux): o OpenSSL embutido foi compilado no Ubuntu e procura os
+    certificados em /usr/lib/ssl, que não existe noutras distribuições (Arch, CachyOS, Fedora…). Sem isso
+    todas as ligações HTTPS falham com CERTIFICATE_VERIFY_FAILED (teste de velocidade, atualizações…).
+    Aponta SSL_CERT_FILE para o ficheiro de certificados do sistema, se o caminho por omissão não servir."""
+    if not sys.platform.startswith("linux") or os.environ.get("SSL_CERT_FILE"):
+        return
+    try:
+        import ssl
+        paths = ssl.get_default_verify_paths()
+    except Exception:  # noqa: BLE001
+        return
+    if (paths.cafile and os.path.isfile(paths.cafile)) or (paths.capath and os.path.isdir(paths.capath)
+                                                          and any(os.scandir(paths.capath))):
+        return
+    for f in _CA_BUNDLES:
+        if os.path.isfile(f):
+            os.environ["SSL_CERT_FILE"] = f
+            return
+
+
 def self_executable() -> str:
     """Executável do Nexo que continua a existir depois de este processo sair. Na AppImage é o próprio
     ficheiro .AppImage: sys.executable aponta para a montagem temporária, que desaparece quando o Nexo fecha

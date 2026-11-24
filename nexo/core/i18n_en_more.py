@@ -2307,6 +2307,12 @@ EN_MORE: dict[str, str] = {
         "No internet connection (network unreachable).",
     "Erro de segurança na ligação (certificado). Verifique a data e hora do sistema.":
         "Security error on the connection (certificate). Check the system date and time.",
+    "Erro de segurança na ligação (certificado fora de prazo). Verifique a data e hora do sistema.":
+        "Security error on the connection (certificate out of date range). Check the system date and time.",
+    ("Erro de segurança na ligação: não foram encontrados os certificados do sistema. Instale/atualize "
+     "o pacote ca-certificates ou use a versão mais recente do Nexo."):
+        "Security error on the connection: the system certificates were not found. Install/update the "
+        "ca-certificates package or use the latest version of Nexo.",
     "Demasiados pedidos ao servidor — aguarde um pouco e tente de novo.":
         "Too many requests to the server — wait a bit and try again.",
     "O servidor está com problemas. Tente mais tarde.":

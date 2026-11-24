@@ -277,6 +277,11 @@ def friendly_error(exc: BaseException | str) -> str:
         return "O servidor recusou a ligação. Tente mais tarde."
     if "network is unreachable" in low or "10051" in low or "no route to host" in low:
         return "Sem ligação à internet (rede inacessível)."
+    if "has expired" in low or "not yet valid" in low:
+        return "Erro de segurança na ligação (certificado fora de prazo). Verifique a data e hora do sistema."
+    if "local issuer" in low or "unable to get" in low or "self-signed" in low or "self signed" in low:
+        return ("Erro de segurança na ligação: não foram encontrados os certificados do sistema. Instale/atualize "
+                "o pacote ca-certificates ou use a versão mais recente do Nexo.")
     if "certificate" in low or "ssl" in low:
         return "Erro de segurança na ligação (certificado). Verifique a data e hora do sistema."
     if "http error 429" in low:
