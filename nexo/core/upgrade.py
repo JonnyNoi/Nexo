@@ -14,7 +14,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 
-# Referências do benchmark do Nexo (ver README): i5-12400F ≈ 1290 multi / 196 single; RX 6500 XT ≈ 1500 (1080p)
+# Referências do benchmark do Nexo (ver FUNCIONALIDADES.md): i5-12400F ≈ 1290 multi / 196 single; RX 6500 XT ≈ 1500 (1080p)
 CPU_MULTI_LOW, CPU_MULTI_OK = 700, 1100
 CPU_SINGLE_LOW, CPU_SINGLE_OK = 120, 170
 GPU_LOW, GPU_OK = 900, 2500           # pontuação da placa gráfica em 1080p (FPS × 10)
